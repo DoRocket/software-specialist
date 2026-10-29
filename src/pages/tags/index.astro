@@ -1,0 +1,22 @@
+---
+import Base from '../../layouts/Base.astro';
+import { allTags, getTopicTree, tagUrl } from '../../lib/topics';
+
+const tags = allTags(await getTopicTree());
+---
+
+<Base title="タグ一覧" description="分野をまたいでトピックを探せるタグの一覧">
+  <h1>タグ一覧</h1>
+  <p>分野をまたいだ観点（計算問題、暗号、プロトコル など）でトピックを探せます。</p>
+  <ul class="tag-cloud">
+    {
+      tags.map(({ tag, count }) => (
+        <li>
+          <a class="tag" href={tagUrl(tag)}>
+            #{tag} <span class="muted">{count}</span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</Base>

@@ -1,0 +1,29 @@
+---
+import type { ExamId } from '../data/exams';
+import type { TopicNode } from '../lib/topics';
+import { topicUrl } from '../lib/topics';
+import ExamBadges from './ExamBadges.astro';
+
+/** 指定した試験の範囲に含まれるトピックだけを階層付きで表示する */
+interface Props {
+  nodes: TopicNode[];
+  exam: ExamId;
+}
+const { nodes, exam } = Astro.props;
+const included = (n: TopicNode) => n.deepExams.includes(exam);
+---
+
+<ul class="exam-tree">
+  {
+    nodes.filter(included).map((n) => {
+      const own = n.entry.data.exams.includes(exam);
+      return (
+        <li class={own ? undefined : 'muted'}>
+          <a href={topicUrl(n.id)}>{n.entry.data.title}</a>
+          {own && <ExamBadges exams={n.entry.data.exams} />}
+          {n.children.some(included) && <Astro.self nodes={n.children} exam={exam} />}
+        </li>
+      );
+    })
+  }
+</ul>

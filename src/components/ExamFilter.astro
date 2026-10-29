@@ -1,0 +1,14 @@
+---
+import { exams } from '../data/exams';
+---
+
+<div class="exam-filter" role="group" aria-label="試験範囲で絞り込み">
+  <span class="exam-filter-label">試験範囲</span>
+  {
+    exams.map((e) => (
+      <button type="button" class={`exam-chip exam-${e.id}`} data-exam-toggle={e.id} aria-pressed="false" title={e.name}>
+        {e.short}
+      </button>
+    ))
+  }
+</div>

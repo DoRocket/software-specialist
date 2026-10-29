@@ -1,0 +1,28 @@
+---
+import { examById, type ExamId } from '../data/exams';
+import { url } from '../lib/topics';
+
+interface Props {
+  exams: readonly ExamId[];
+  link?: boolean;
+}
+const { exams, link = false } = Astro.props;
+---
+
+{
+  exams.length > 0 && (
+    <span class="exam-badges">
+      {exams.map((id) =>
+        link ? (
+          <a class={`exam-badge exam-${id}`} href={url(`exams/${id}`)} title={examById[id].name}>
+            {examById[id].short}
+          </a>
+        ) : (
+          <span class={`exam-badge exam-${id}`} title={examById[id].name}>
+            {examById[id].short}
+          </span>
+        ),
+      )}
+    </span>
+  )
+}

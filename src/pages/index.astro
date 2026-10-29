@@ -1,0 +1,50 @@
+---
+import Base from '../layouts/Base.astro';
+import TopicCard from '../components/TopicCard.astro';
+import { exams } from '../data/exams';
+import { getTopicTree, url } from '../lib/topics';
+
+const tree = await getTopicTree();
+const examCounts = Object.fromEntries(
+  exams.map((e) => [e.id, tree.flat.filter((n) => n.entry.data.exams.includes(e.id)).length]),
+);
+---
+
+<Base description="ITパスポート・基本情報・応用情報の範囲を、技術の階層構造で体系的に学べる学習サイト">
+  <section class="hero">
+    <h1>技術の地図をたどって、<br />ソフトウェアスペシャリストへ。</h1>
+    <p>
+      資格ごとの暗記ではなく、「ネットワーク › インターネット層 › IPアドレス › アドレスクラス」のように
+      <strong>大きな分野から詳細な技術へ</strong>と掘り下げて学べます。
+      各トピックには試験範囲（IP / FE / AP）とタグが付いており、右上のボタンでいつでも絞り込めます。
+    </p>
+    <p class="hero-actions">
+      <a class="button" href={url('tree')}>全体マップを見る</a>
+      <a class="button button-secondary" href={url('exams')}>試験別に見る</a>
+    </p>
+  </section>
+
+  <section>
+    <h2>分野</h2>
+    <div class="card-grid">
+      {tree.roots.map((n) => <TopicCard node={n} />)}
+    </div>
+  </section>
+
+  <section>
+    <h2>試験範囲から探す</h2>
+    <ul class="exam-list">
+      {
+        exams.map((e) => (
+          <li>
+            <a href={url(`exams/${e.id}`)}>
+              <span class={`exam-badge exam-${e.id}`}>{e.short}</span>
+              {e.name}
+              <span class="muted">（{examCounts[e.id]} トピック）</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+</Base>

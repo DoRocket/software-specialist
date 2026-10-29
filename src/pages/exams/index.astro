@@ -1,0 +1,30 @@
+---
+import Base from '../../layouts/Base.astro';
+import { exams } from '../../data/exams';
+import { getTopicTree, url } from '../../lib/topics';
+
+const tree = await getTopicTree();
+---
+
+<Base title="試験別" description="試験ごとの出題範囲に含まれるトピック">
+  <h1>試験別に見る</h1>
+  <p>
+    コンテンツは技術の階層で整理していますが、各トピックには出題範囲となる試験が付いています。
+    試験を選ぶと、その試験の範囲に含まれるトピックだけを階層付きで確認できます。
+  </p>
+  <ul class="exam-list">
+    {
+      exams.map((e) => (
+        <li>
+          <a href={url(`exams/${e.id}`)}>
+            <span class={`exam-badge exam-${e.id}`}>{e.short}</span>
+            {e.name}
+            <span class="muted">
+              （ITSS レベル{e.level}・{tree.flat.filter((n) => n.entry.data.exams.includes(e.id)).length} トピック）
+            </span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</Base>

@@ -1,0 +1,36 @@
+---
+import Base from '../../layouts/Base.astro';
+import { examById, exams, type ExamId } from '../../data/exams';
+import { getTopicTree, topicUrl, url, type TopicNode } from '../../lib/topics';
+import ExamTree from '../../components/ExamTree.astro';
+
+export function getStaticPaths() {
+  return exams.map((e) => ({ params: { exam: e.id }, props: { exam: e.id } }));
+}
+
+const { exam } = Astro.props as { exam: ExamId };
+const info = examById[exam];
+const tree = await getTopicTree();
+const included = (n: TopicNode) => n.deepExams.includes(exam);
+const count = tree.flat.filter((n) => n.entry.data.exams.includes(exam)).length;
+---
+
+<Base title={info.name} description={`${info.name}の出題範囲に含まれるトピック`}>
+  <p class="breadcrumbs-simple"><a href={url('exams')}>試験別</a></p>
+  <h1><span class={`exam-badge exam-${exam}`}>{info.short}</span> {info.name}</h1>
+  <p>
+    この試験の範囲に含まれる {count} トピックを、技術の階層で表示しています。
+    <span class="muted">（灰色の項目は配下に該当トピックがある上位分野です）</span>
+  </p>
+
+  {
+    tree.roots.filter(included).map((root) => (
+      <section class="exam-section">
+        <h2>
+          <a href={topicUrl(root.id)}>{root.entry.data.title}</a>
+        </h2>
+        <ExamTree nodes={root.children} exam={exam} />
+      </section>
+    ))
+  }
+</Base>

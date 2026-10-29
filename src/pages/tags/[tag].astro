@@ -1,0 +1,23 @@
+---
+import Base from '../../layouts/Base.astro';
+import TopicList from '../../components/TopicList.astro';
+import { allTags, getTopicTree, url } from '../../lib/topics';
+
+export async function getStaticPaths() {
+  const tags = allTags(await getTopicTree());
+  return tags.map(({ tag }) => ({ params: { tag }, props: { tag } }));
+}
+
+const { tag } = Astro.props;
+const tree = await getTopicTree();
+const nodes = tree.flat.filter((n) => n.entry.data.tags.includes(tag));
+---
+
+<Base title={`#${tag}`} description={`タグ「${tag}」が付いたトピック`}>
+  <p class="breadcrumbs-simple"><a href={url('tags')}>タグ一覧</a></p>
+  <h1>#{tag}</h1>
+  <p>
+    {nodes.length} 件のトピック。<a href={`${url('tree')}?tag=${encodeURIComponent(tag)}`}>全体マップで位置を確認する</a>
+  </p>
+  <TopicList nodes={nodes} />
+</Base>

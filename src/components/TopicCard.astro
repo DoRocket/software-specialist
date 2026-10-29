@@ -1,0 +1,21 @@
+---
+import type { TopicNode } from '../lib/topics';
+import { countDescendants, topicUrl } from '../lib/topics';
+import ExamBadges from './ExamBadges.astro';
+
+interface Props {
+  node: TopicNode;
+}
+const { node } = Astro.props;
+const d = node.entry.data;
+const count = countDescendants(node);
+---
+
+<a class="card" href={topicUrl(node.id)} data-deep-exams={node.deepExams.join(' ')}>
+  <span class="card-title">{d.title}</span>
+  {d.summary && <span class="card-summary">{d.summary}</span>}
+  <span class="card-meta">
+    <ExamBadges exams={node.deepExams} />
+    {count > 0 && <span class="card-count">{count} 項目</span>}
+  </span>
+</a>

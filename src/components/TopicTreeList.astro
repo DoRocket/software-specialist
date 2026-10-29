@@ -1,0 +1,56 @@
+---
+import type { TopicNode } from '../lib/topics';
+import { topicUrl } from '../lib/topics';
+import ExamBadges from './ExamBadges.astro';
+
+interface Props {
+  nodes: TopicNode[];
+  /** 現在表示中のトピック id（ハイライト・展開用） */
+  currentId?: string;
+  /** 一覧にサマリーを表示するか */
+  showSummary?: boolean;
+  /** すべて展開した状態で表示するか */
+  expandAll?: boolean;
+}
+const { nodes, currentId, showSummary = false, expandAll = false } = Astro.props;
+
+const isOpen = (node: TopicNode) =>
+  expandAll || (currentId !== undefined && (currentId === node.id || currentId.startsWith(`${node.id}/`)));
+---
+
+<ul class="tree">
+  {
+    nodes.map((node) => {
+      const d = node.entry.data;
+      const label = (
+        <span class="tree-label">
+          <a href={topicUrl(node.id)} aria-current={currentId === node.id ? 'page' : undefined}>
+            {d.title}
+          </a>
+          <ExamBadges exams={d.exams} />
+        </span>
+      );
+      return (
+        <li
+          data-topic={node.id}
+          data-exams={d.exams.join(' ')}
+          data-tags={d.tags.join('\u001f')}
+          data-search={`${d.title} ${d.summary ?? ''} ${d.tags.join(' ')}`.toLowerCase()}
+        >
+          {node.children.length > 0 ? (
+            <details open={isOpen(node)}>
+              <summary>{label}</summary>
+              {showSummary && d.summary && <p class="tree-summary">{d.summary}</p>}
+              <Astro.self nodes={node.children} currentId={currentId} showSummary={showSummary} expandAll={expandAll} />
+            </details>
+          ) : (
+            <>
+              <span class="tree-leaf">{label}</span>
+              {showSummary && d.summary && <p class="tree-summary">{d.summary}</p>}
+            </>
+          )}
+        </li>
+      );
+    })
+  }
+</ul>

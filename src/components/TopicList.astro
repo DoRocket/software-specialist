@@ -1,0 +1,29 @@
+---
+import type { TopicNode } from '../lib/topics';
+import { ancestry, topicUrl } from '../lib/topics';
+import ExamBadges from './ExamBadges.astro';
+
+/** 階層の位置（パンくず）付きのフラットなトピック一覧 */
+interface Props {
+  nodes: TopicNode[];
+}
+const { nodes } = Astro.props;
+---
+
+<ul class="topic-list">
+  {
+    nodes.map((n) => (
+      <li data-deep-exams={n.deepExams.join(' ')}>
+        <span class="topic-list-path">
+          {ancestry(n)
+            .slice(0, -1)
+            .map((a) => a.entry.data.title)
+            .join(' › ')}
+        </span>
+        <a href={topicUrl(n.id)}>{n.entry.data.title}</a>
+        <ExamBadges exams={n.entry.data.exams} />
+        {n.entry.data.summary && <p class="topic-list-summary">{n.entry.data.summary}</p>}
+      </li>
+    ))
+  }
+</ul>
