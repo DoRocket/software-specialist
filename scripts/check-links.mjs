@@ -16,9 +16,11 @@ function* htmlFiles(dir) {
 
 const exists = (p) => (existsSync(p) && statSync(p).isFile()) || existsSync(join(p, 'index.html'));
 
+let pages = 0;
 let checked = 0;
 const broken = [];
 for (const file of htmlFiles(root)) {
+  pages++;
   const html = readFileSync(file, 'utf8');
   for (const [, link] of html.matchAll(/(?:href|src)="([^"#?]+)/g)) {
     if (/^[a-z]+:/i.test(link)) continue; // http:, mailto: などの外部リンク
@@ -37,8 +39,12 @@ for (const file of htmlFiles(root)) {
   }
 }
 
+if (pages === 0) {
+  console.error(`${root}/ に HTML がありません。先に npm run build を実行してください。`);
+  process.exit(1);
+}
 if (broken.length) {
   for (const [file, link] of broken) console.error(`リンク切れ: ${file} -> ${link}`);
   process.exit(1);
 }
-console.log(`${checked} 件のサイト内リンクを検査しました。リンク切れはありません。`);
+console.log(`${pages} ページ・${checked} 件のサイト内リンクを検査しました。リンク切れはありません。`);
