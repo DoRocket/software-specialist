@@ -1,0 +1,111 @@
+---
+import { render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import ExamBadges from '../../components/ExamBadges.astro';
+import TagList from '../../components/TagList.astro';
+import TopicCard from '../../components/TopicCard.astro';
+import { ancestry, getTopicTree, topicUrl, url, type TopicNode } from '../../lib/topics';
+
+export async function getStaticPaths() {
+  const tree = await getTopicTree();
+  return tree.flat.map((node) => ({ params: { slug: node.id }, props: { id: node.id } }));
+}
+
+const { id } = Astro.props;
+const tree = await getTopicTree();
+const node = tree.byId.get(id) as TopicNode;
+const d = node.entry.data;
+const { Content } = await render(node.entry);
+const crumbs = ancestry(node).slice(0, -1);
+const related = d.related.map((r) => tree.byId.get(r)!);
+const index = tree.flat.indexOf(node);
+const prev = tree.flat[index - 1];
+const next = tree.flat[index + 1];
+---
+
+<Base title={d.title} description={d.summary} currentId={id}>
+  <article class="topic">
+    <nav class="breadcrumbs" aria-label="パンくずリスト">
+      <ol>
+        <li><a href={url()}>ホーム</a></li>
+        {
+          crumbs.map((c) => (
+            <li>
+              <a href={topicUrl(c.id)}>{c.entry.data.title}</a>
+            </li>
+          ))
+        }
+      </ol>
+    </nav>
+
+    <header class="topic-header">
+      <h1>{d.title}</h1>
+      {d.summary && <p class="topic-summary">{d.summary}</p>}
+      <div class="topic-meta">
+        <ExamBadges exams={d.exams} link />
+        <TagList tags={d.tags} />
+      </div>
+    </header>
+
+    <p class="notice" data-out-of-scope={node.deepExams.join(' ')} hidden>
+      このトピックは、選択中の試験範囲には含まれていません（参考として表示しています）。
+    </p>
+
+    <div class="prose">
+      <Content />
+    </div>
+
+    {
+      node.children.length > 0 && (
+        <section class="children">
+          <h2>この分野のトピック</h2>
+          <div class="card-grid">
+            {node.children.map((c) => (
+              <TopicCard node={c} />
+            ))}
+          </div>
+        </section>
+      )
+    }
+
+    {
+      related.length > 0 && (
+        <section class="related">
+          <h2>関連トピック</h2>
+          <ul>
+            {related.map((r) => (
+              <li>
+                <a href={topicUrl(r.id)}>
+                  {ancestry(r)
+                    .map((a) => a.entry.data.title)
+                    .join(' › ')}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+
+    <nav class="pager" aria-label="前後のトピック">
+      {
+        prev ? (
+          <a class="pager-prev" href={topicUrl(prev.id)}>
+            <span>前へ</span>
+            {prev.entry.data.title}
+          </a>
+        ) : (
+          <span />
+        )
+      }
+      {
+        next && (
+          <a class="pager-next" href={topicUrl(next.id)}>
+            <span>次へ</span>
+            {next.entry.data.title}
+          </a>
+        )
+      }
+    </nav>
+  </article>
+</Base>

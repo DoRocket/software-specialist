@@ -1,0 +1,39 @@
+---
+import Base from '../layouts/Base.astro';
+import TopicTreeList from '../components/TopicTreeList.astro';
+import { allTags, getTopicTree } from '../lib/topics';
+
+const tree = await getTopicTree();
+const tags = allTags(tree);
+---
+
+<Base title="全体マップ" description="全トピックの階層構造。試験範囲・タグ・キーワードで絞り込めます。">
+  <h1>全体マップ</h1>
+  <p>すべてのトピックを技術の階層で表示しています。試験範囲（右上）・タグ・キーワードで絞り込めます。</p>
+
+  <div class="filter-panel" data-tree-filter>
+    <label>
+      タグ
+      <select data-tag-select>
+        <option value="">すべて</option>
+        {
+          tags.map(({ tag, count }) => (
+            <option value={tag}>
+              {tag}（{count}）
+            </option>
+          ))
+        }
+      </select>
+    </label>
+    <label>
+      キーワード
+      <input type="search" placeholder="例: サブネット" data-search-input />
+    </label>
+    <button type="button" class="button button-secondary" data-filter-reset>条件をクリア</button>
+    <span class="muted">該当 <span data-match-count></span> 件</span>
+  </div>
+
+  <div class="tree-map" data-filter-scope>
+    <TopicTreeList nodes={tree.roots} showSummary expandAll />
+  </div>
+</Base>
