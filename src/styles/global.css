@@ -257,6 +257,7 @@ a {
   margin: 1px 0;
 }
 .tree summary {
+  display: flex;
   cursor: pointer;
   list-style: none;
 }
@@ -266,6 +267,7 @@ a {
 .tree summary::before {
   content: '▸';
   display: inline-block;
+  flex: none;
   width: 1em;
   color: var(--fg-muted);
   transition: transform 0.15s;
