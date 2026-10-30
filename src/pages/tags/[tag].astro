@@ -1,11 +1,11 @@
 ---
 import Base from '../../layouts/Base.astro';
 import TopicList from '../../components/TopicList.astro';
-import { allTags, getTopicTree, url } from '../../lib/topics';
+import { allTags, getTopicTree, tagSlug, url } from '../../lib/topics';
 
 export async function getStaticPaths() {
   const tags = allTags(await getTopicTree());
-  return tags.map(({ tag }) => ({ params: { tag }, props: { tag } }));
+  return tags.map(({ tag }) => ({ params: { tag: tagSlug(tag) }, props: { tag } }));
 }
 
 const { tag } = Astro.props;

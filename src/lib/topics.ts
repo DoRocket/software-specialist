@@ -98,6 +98,12 @@ export function allTags(tree: TopicTree): { tag: string; count: number }[] {
   for (const node of tree.flat) {
     for (const t of node.entry.data.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
   }
+  const slugs = new Map<string, string>();
+  for (const tag of counts.keys()) {
+    const other = slugs.get(tagSlug(tag));
+    if (other !== undefined) throw new Error(`タグ "${other}" と "${tag}" の URL が同じ "${tagSlug(tag)}" になります。どちらかの表記を変えてください。`);
+    slugs.set(tagSlug(tag), tag);
+  }
   return [...counts]
     .map(([tag, count]) => ({ tag, count }))
     .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, 'ja'));
@@ -114,6 +120,11 @@ export function topicUrl(id: string): string {
   return url(`topics/${id}`);
 }
 
+/** タグを URL の1階層に収まる文字列にする（「UI/UX」の / などをハイフンに置き換える） */
+export function tagSlug(tag: string): string {
+  return tag.trim().replace(/[\s/\\?#%]+/g, '-');
+}
+
 export function tagUrl(tag: string): string {
-  return url(`tags/${encodeURIComponent(tag)}`);
+  return url(`tags/${encodeURIComponent(tagSlug(tag))}`);
 }
