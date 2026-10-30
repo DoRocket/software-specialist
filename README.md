@@ -22,6 +22,7 @@ npm install
 npm run dev      # http://localhost:4321
 npm run build    # dist/ に静的サイトを出力
 npm run check    # 型チェック
+npm run check:links  # ビルド結果のリンク切れ検査
 ```
 
 サブパスで公開する場合（GitHub Pages など）は `SITE` と `BASE_PATH` 環境変数を指定してビルドします。
@@ -29,6 +30,18 @@ npm run check    # 型チェック
 ```bash
 SITE=https://example.github.io BASE_PATH=/software-specialist npm run build
 ```
+
+## 公開（GitHub Pages）
+
+`main` ブランチへの push で `.github/workflows/deploy.yml` が動き、GitHub Pages に公開されます。
+初回のみ、リポジトリの **Settings → Pages → Build and deployment → Source** を **GitHub Actions** に設定してください。
+公開 URL とサブパス（`/software-specialist/`）はワークフローが自動で設定します。
+
+- 非公開（private）リポジトリで Pages を使うには、GitHub Team 以上のプランが必要です。
+- Pages で公開したサイトは、リポジトリが非公開でも **インターネットに公開** されます
+  （閲覧者を組織内に限定できるのは GitHub Enterprise Cloud のみ）。
+
+`npm run check:links` で、ビルド結果のサイト内リンク切れを検査できます（CI とデプロイ時にも実行）。
 
 ## コンテンツの追加
 

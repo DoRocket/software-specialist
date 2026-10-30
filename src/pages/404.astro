@@ -1,0 +1,13 @@
+---
+import Base from '../layouts/Base.astro';
+import { url } from '../lib/topics';
+---
+
+<Base title="ページが見つかりません">
+  <h1>ページが見つかりません</h1>
+  <p>URL が変更されたか、ページが削除された可能性があります。</p>
+  <p class="hero-actions">
+    <a class="button" href={url()}>トップへ戻る</a>
+    <a class="button button-secondary" href={url('tree')}>全体マップから探す</a>
+  </p>
+</Base>
