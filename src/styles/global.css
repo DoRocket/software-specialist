@@ -868,3 +868,14 @@ a {
   width: 56px;
   height: 56px;
 }
+
+/* ---------- 数式（KaTeX） ---------- */
+.math-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 1em 0;
+  padding: 4px 0;
+}
+.prose .katex {
+  font-size: 1.08em;
+}
