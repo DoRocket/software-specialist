@@ -1,4 +1,5 @@
 ---
+icon: database
 title: データベース
 order: 4
 summary: データを整合性を保ちながら共有・管理する仕組み。関係モデル、正規化、SQL、トランザクションを学ぶ

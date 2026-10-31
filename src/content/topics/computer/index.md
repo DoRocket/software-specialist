@@ -1,4 +1,5 @@
 ---
+icon: computer
 title: コンピュータシステム
 order: 2
 summary: CPU・メモリ・OS などコンピュータを構成する要素と、その性能・信頼性の評価

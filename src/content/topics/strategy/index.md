@@ -1,4 +1,5 @@
 ---
+icon: strategy
 title: ストラテジ
 order: 8
 summary: 経営戦略、財務・会計、法務など、ITを活用する企業活動の基礎知識

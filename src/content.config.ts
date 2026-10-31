@@ -10,12 +10,13 @@ import { examIds } from './data/exams';
  *   src/content/topics/network/ip/ip-address/index.md   -> network/ip/ip-address
  *   src/content/topics/network/ip/ip-address/class.md   -> network/ip/ip-address/class
  * 子を持つトピックは「ディレクトリ + index.md」、末端は単独の .md にする。
+ * 図やアニメーションの部品（src/components/diagrams/）を使う記事は .mdx にする。
  */
 const topics = defineCollection({
   loader: glob({
-    pattern: '**/*.md',
+    pattern: '**/*.{md,mdx}',
     base: './src/content/topics',
-    generateId: ({ entry }) => entry.replace(/\.md$/, '').replace(/(^|\/)index$/, ''),
+    generateId: ({ entry }) => entry.replace(/\.mdx?$/, '').replace(/(^|\/)index$/, ''),
   }),
   schema: z.object({
     title: z.string(),
@@ -30,6 +31,8 @@ const topics = defineCollection({
     /** 関連トピックの id（例: network/ip/routing） */
     related: z.array(z.string()).default([]),
     draft: z.boolean().default(false),
+    /** 分野のアイコン名（src/components/CategoryIcon.astro）。主に大分類の index に付ける */
+    icon: z.string().optional(),
   }),
 });
 

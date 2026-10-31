@@ -1,0 +1,114 @@
+---
+/**
+ * 通信の流れ（シーケンス図）をステップ再生で見せる図。
+ * TCP の 3ウェイハンドシェイク、DHCP、DNS など「誰が誰に何を送るか」の説明に使う。
+ *
+ * 使い方（.mdx）:
+ *   <SequenceDiagram
+ *     title="3ウェイハンドシェイク"
+ *     actors={['クライアント', 'サーバ']}
+ *     messages={[
+ *       { from: 0, to: 1, label: 'SYN', note: '接続したいと要求する' },
+ *       { from: 1, to: 0, label: 'SYN + ACK', note: '…' },
+ *     ]}
+ *   />
+ * - from / to は actors の番号（0 始まり）。to に 'all' を指定するとブロードキャスト（送信元以外の全員宛て）。
+ * - dashed: true で応答などを破線にする。
+ */
+import Figure from './Figure.astro';
+
+interface Message {
+  from: number;
+  to: number | 'all';
+  label: string;
+  /** そのステップの説明文 */
+  note?: string;
+  dashed?: boolean;
+}
+interface Props {
+  title?: string;
+  caption?: string;
+  intro?: string;
+  actors: string[];
+  messages: Message[];
+}
+const { title, caption, intro, actors, messages } = Astro.props;
+
+const colW = 200;
+const margin = 90;
+const top = 56;
+const rowH = 58;
+const width = margin * 2 + colW * (actors.length - 1);
+const height = top + rowH * messages.length + 30;
+const x = (i: number) => margin + colW * i;
+
+const arrows = messages.map((m, i) => {
+  const y = top + rowH * (i + 0.75);
+  const targets = m.to === 'all' ? actors.map((_, j) => j).filter((j) => j !== m.from) : [m.to];
+  const lines = targets.map((t) => {
+    const dir = t > m.from ? 1 : -1;
+    return { x1: x(m.from), x2: x(t) - dir * 6, dir };
+  });
+  const farthest = targets.reduce((a, t) => (Math.abs(t - m.from) > Math.abs(a - m.from) ? t : a), targets[0]);
+  const labelX = (x(m.from) + x(farthest)) / 2;
+  return { ...m, step: i + 1, y, lines, labelX };
+});
+---
+
+<Figure title={title} caption={caption} steps={messages.length} intro={intro}>
+  <svg class="seq" viewBox={`0 0 ${width} ${height}`} style={`max-width: ${Math.round(width * 1.5)}px; margin: 0 auto;`} role="img" aria-label={title ?? 'シーケンス図'}>
+    <defs>
+      <marker id="seq-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" class="seq-arrowhead"></path>
+      </marker>
+    </defs>
+    {
+      actors.map((a, i) => (
+        <g>
+          <line class="seq-lifeline" x1={x(i)} y1={top} x2={x(i)} y2={height - 8} />
+          <rect class="seq-actor" x={x(i) - 70} y="8" width="140" height="36" rx="8" />
+          <text class="seq-actor-label" x={x(i)} y="31" text-anchor="middle">
+            {a}
+          </text>
+        </g>
+      ))
+    }
+    {
+      arrows.map((a) => (
+        <g class="seq-msg" data-step={a.step}>
+          {a.lines.map((l) => (
+            <line
+              class:list={['seq-line', { 'seq-dashed': a.dashed }]}
+              x1={l.x1}
+              y1={a.y}
+              x2={l.x2}
+              y2={a.y}
+              marker-end="url(#seq-arrow)"
+            />
+          ))}
+          <text class="seq-label" x={a.labelX} y={a.y - 9} text-anchor="middle">
+            {a.to === 'all' ? `${a.label}（全員宛て）` : a.label}
+          </text>
+          <circle class="seq-num-bg" cx={x(a.from)} cy={a.y} r="10" />
+          <text class="seq-num" x={x(a.from)} y={a.y + 4} text-anchor="middle">
+            {a.step}
+          </text>
+        </g>
+      ))
+    }
+  </svg>
+  <Fragment slot="narration">
+    {
+      arrows.map((a) =>
+        a.note ? (
+          <p data-step-only={a.step}>
+            <strong>
+              {a.step}. {a.label}
+            </strong>
+            ：{a.note}
+          </p>
+        ) : null,
+      )
+    }
+  </Fragment>
+</Figure>

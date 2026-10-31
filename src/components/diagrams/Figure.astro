@@ -1,0 +1,42 @@
+---
+/**
+ * 図の共通の枠。steps を指定するとステップ再生の操作ボタンを付ける。
+ * 中身では data-step / data-step-only を使う（src/scripts/stepper.ts 参照）。
+ */
+interface Props {
+  title?: string;
+  caption?: string;
+  /** ステップ数。0 なら静的な図（操作ボタンなし） */
+  steps?: number;
+  /** 説明文の初期表示（ステップ 0 のとき） */
+  intro?: string;
+}
+const { title, caption, steps = 0, intro } = Astro.props;
+---
+
+<figure class="diagram" data-stepper={steps > 0 ? '' : undefined} data-steps={steps > 0 ? steps : undefined}>
+  {title && <figcaption class="diagram-title">{title}</figcaption>}
+  <div class="diagram-body">
+    <slot />
+  </div>
+  {
+    steps > 0 && (
+      <div class="diagram-narration" aria-live="polite">
+        {intro && <p data-step-only="0">{intro}</p>}
+        <slot name="narration" />
+      </div>
+    )
+  }
+  {
+    steps > 0 && (
+      <div class="diagram-controls">
+        <button type="button" data-stepper-act="reset" aria-label="最初に戻す">⟲</button>
+        <button type="button" data-stepper-act="prev" aria-label="前のステップ">‹ 前へ</button>
+        <button type="button" data-stepper-act="play" aria-pressed="false">▶ 再生</button>
+        <button type="button" data-stepper-act="next" aria-label="次のステップ">次へ ›</button>
+        <span class="diagram-count" data-stepper-count>0 / {steps}</span>
+      </div>
+    )
+  }
+  {caption && <p class="diagram-caption">{caption}</p>}
+</figure>

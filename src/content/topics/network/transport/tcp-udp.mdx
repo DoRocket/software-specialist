@@ -7,6 +7,8 @@ tags: [頻出, プロトコル, 用語]
 related: [network/application/protocols, network/ip/ip-address/private-address]
 ---
 
+import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.astro';
+
 **TCP**（Transmission Control Protocol）と **UDP**（User Datagram Protocol）は、トランスポート層の代表的なプロトコルです。
 アプリケーションは、用途に応じてどちらを使うかを選びます。
 
@@ -28,13 +30,16 @@ related: [network/application/protocols, network/ip/ip-address/private-address]
 
 ### 3ウェイハンドシェイク（コネクション確立）
 
-```
-クライアント                        サーバ
-     │ ── SYN ──────────────────────> │   ① 接続要求
-     │ <─────────────── SYN + ACK ─── │   ② 要求の確認と、サーバからの接続要求
-     │ ── ACK ──────────────────────> │   ③ 確認
-     │      （ここからデータ送受信）    │
-```
+<SequenceDiagram
+  title="3ウェイハンドシェイク"
+  intro="クライアントがサーバに接続するとき、データを送る前に3回のやり取りで「お互いに準備ができたこと」を確認します。"
+  actors={['クライアント', 'サーバ']}
+  messages={[
+    { from: 0, to: 1, label: 'SYN', note: 'クライアントが「接続したい」と要求する（SYN = 同期要求）。' },
+    { from: 1, to: 0, label: 'SYN + ACK', note: 'サーバが要求を受け取ったこと（ACK）を返し、同時にサーバ側からも接続を要求する（SYN）。' },
+    { from: 0, to: 1, label: 'ACK', note: 'クライアントがサーバの要求を確認する。これで接続が確立し、データの送受信を始められる。' },
+  ]}
+/>
 
 3回のやり取りで双方が通信の準備ができたことを確認します。終了時は FIN を使って接続を解放します。
 

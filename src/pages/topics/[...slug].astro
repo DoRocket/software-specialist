@@ -4,6 +4,7 @@ import Base from '../../layouts/Base.astro';
 import ExamBadges from '../../components/ExamBadges.astro';
 import TagList from '../../components/TagList.astro';
 import TopicCard from '../../components/TopicCard.astro';
+import CategoryIcon from '../../components/CategoryIcon.astro';
 import { ancestry, getTopicTree, topicUrl, url, type TopicNode } from '../../lib/topics';
 
 export async function getStaticPaths() {
@@ -17,6 +18,7 @@ const node = tree.byId.get(id) as TopicNode;
 const d = node.entry.data;
 const { Content } = await render(node.entry);
 const crumbs = ancestry(node).slice(0, -1);
+const icon = ancestry(node)[0].entry.data.icon;
 const related = d.related.map((r) => tree.byId.get(r)!);
 const index = tree.flat.indexOf(node);
 const prev = tree.flat[index - 1];
@@ -39,7 +41,10 @@ const next = tree.flat[index + 1];
     </nav>
 
     <header class="topic-header">
-      <h1>{d.title}</h1>
+      <div class="topic-header-row">
+        {icon && <CategoryIcon name={icon} />}
+        <h1>{d.title}</h1>
+      </div>
       {d.summary && <p class="topic-summary">{d.summary}</p>}
       <div class="topic-meta">
         <ExamBadges exams={d.exams} link />
