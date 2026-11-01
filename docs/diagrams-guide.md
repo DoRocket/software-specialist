@@ -83,6 +83,8 @@ import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.ast
 | `ArrowDiagram` | アローダイアグラムの最早・最遅結合点時刻を計算しながらステップ再生し、クリティカルパスを強調（props: nodes, activities, width, height, unit, note） |
 | `NormalizationSteps` | 正規化で表が分割されていく様子（非正規形 → 第3正規形）をステップ再生。列を分割先の表ごとに色分け（props: stages, groups） |
 | `AuditProcessFlow` | システム監査の流れ（監査計画 → 予備調査 → 本調査 → 評価・結論 → 監査報告 → フォローアップ）を各段階の成果物つきでステップ再生。改善の実施は監査対象部門であることを色分けで示す |
+| `IncidentFlow` | インシデント発生 → サービスデスク → エスカレーション → 回避策で回復 → 問題管理（根本原因・既知の誤り）→ 変更管理（RFC）をステップ再生。HTML の箱で組むので狭い画面でも読める（props: example） |
+| `RecoveryTimeline` | 最後のバックアップ → 障害発生 → 業務再開 の時間軸で、失うデータ（RPO と比べる）と停止時間（RTO と比べる）をステップ再生（props: backup, failure, recovery） |
 
 部品を追加したらこの表に追記してください。
 
