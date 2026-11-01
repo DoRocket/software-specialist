@@ -32,7 +32,9 @@ www . example . co . jp .
 
 1. PC（**スタブリゾルバ**）が、設定された **フルサービスリゾルバ（キャッシュDNSサーバ）** に `www.example.co.jp` の IPアドレスを問い合わせる
 2. フルサービスリゾルバは、キャッシュに答えがなければ **ルートサーバ** に問い合わせ、`jp` を管理するサーバを教えてもらう
-3. 同様に `jp` → `co.jp` → `example.co.jp` の権威DNSサーバへと順にたどる（反復問合せ）
+3. 同様に `jp` の権威DNSサーバに問い合わせて `example.co.jp` を管理するサーバを教えてもらい、そこへ問い合わせる（このように順にたどる問合せを **反復問合せ** という）
+
+> 名前の階層とサーバの分担は一致するとは限りません。`co.jp` は `jp` のサーバがまとめて管理しているため、`jp` のサーバが直接 `example.co.jp` のサーバを教えます。
 4. `example.co.jp` の権威DNSサーバから IPアドレスを得て PC に返し、結果を **TTL** の間キャッシュする
 
 PC からフルサービスリゾルバへの「最終的な答えをください」という問合せを **再帰問合せ** と呼びます。
@@ -42,18 +44,16 @@ PC からフルサービスリゾルバへの「最終的な答えをくださ�
 <SequenceDiagram
   title="www.example.co.jp の名前解決"
   intro="PC が www.example.co.jp の IPアドレスを知りたい。フルサービスリゾルバのキャッシュには、まだ答えがないものとします。"
-  actors={['PC', 'フルサービスリゾルバ', 'ルートサーバ', 'jp', 'co.jp', 'example.co.jp']}
-  colWidth={160}
+  actors={['PC', 'フルサービスリゾルバ', 'ルートサーバ', 'jp', 'example.co.jp']}
+  colWidth={180}
   messages={[
     { from: 0, to: 1, label: '再帰問合せ', note: 'PC（スタブリゾルバ）が、設定されたフルサービスリゾルバに www.example.co.jp の IPアドレスを問い合わせる。「最終的な答えをください」という再帰問合せ。' },
     { from: 1, to: 2, label: '問合せ', note: 'キャッシュに答えがないので、フルサービスリゾルバはまずルートサーバに問い合わせる。' },
     { from: 2, to: 1, label: 'jp はこちら', dashed: true, note: 'ルートサーバは答えそのものではなく、jp を管理するサーバを教える。' },
     { from: 1, to: 3, label: '問合せ', note: '教えてもらった jp のサーバに問い合わせる。' },
-    { from: 3, to: 1, label: 'co.jp はこちら', dashed: true, note: 'co.jp を管理するサーバを教えてもらう。' },
-    { from: 1, to: 4, label: '問合せ', note: 'co.jp のサーバに問い合わせる。' },
-    { from: 4, to: 1, label: 'example.co.jp はこちら', dashed: true, note: 'example.co.jp を管理する権威DNSサーバを教えてもらう。このように順にたどる問合せが反復問合せ。' },
-    { from: 1, to: 5, label: '問合せ', note: 'example.co.jp の権威DNSサーバに問い合わせる。' },
-    { from: 5, to: 1, label: 'IPアドレス', dashed: true, note: '権威DNSサーバが www.example.co.jp の IPアドレス（A レコード）を答える。' },
+    { from: 3, to: 1, label: 'example.co.jp はこちら', dashed: true, note: 'co.jp も jp のサーバが管理しているので、jp のサーバが example.co.jp を管理する権威DNSサーバを教える。このように順にたどる問合せが反復問合せ。' },
+    { from: 1, to: 4, label: '問合せ', note: 'example.co.jp の権威DNSサーバに問い合わせる。' },
+    { from: 4, to: 1, label: 'IPアドレス', dashed: true, note: '権威DNSサーバが www.example.co.jp の IPアドレス（A レコード）を答える。' },
     { from: 1, to: 0, label: 'IPアドレス', dashed: true, note: 'フルサービスリゾルバが PC に IPアドレスを返し、結果を TTL の間キャッシュする。次に同じ問合せが来たら、キャッシュから答えられる。' },
   ]}
 />

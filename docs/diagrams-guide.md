@@ -57,7 +57,11 @@ import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.ast
 
 | 部品 | 用途 |
 | --- | --- |
-| `SequenceDiagram` | 「誰が誰に何を送るか」の流れ（TCP、DHCP、DNS、ARP、TLS など） |
+| `SequenceDiagram` | 「誰が誰に何を送るか」の流れ（TCP、DHCP、DNS、ARP、TLS など）。`colWidth` で列の間隔を指定できる。幅の広い図はスマートフォンで横スクロール |
+| `Encapsulation` | カプセル化と非カプセル化（送信側でヘッダを付け、受信側で外す）のステップ再生 |
+| `SubnetCalculator` | IPv4 アドレスとプレフィックス長から、ネットワーク部とホスト部の色分け、各アドレス、ホスト数を即時計算（props: ip, prefix） |
+| `SwitchLearning` | L2スイッチの MACアドレス学習・フラッディング・転送のステップ再生 |
+| `TransferTimeCalculator` | データ量・回線速度・伝送効率から伝送時間を式つきで計算（props: size, sizeUnit, speed, speedUnit, efficiency） |
 
 部品を追加したらこの表に追記してください。
 
