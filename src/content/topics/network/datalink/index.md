@@ -4,6 +4,21 @@ order: 2
 summary: 同じネットワーク内で隣接する機器にフレームを届ける層。有線LAN（Ethernet）と無線LANを扱う
 exams: [ip, fe, ap]
 tags: [プロトコル]
+quiz:
+  - q: 'データリンク層の役割として正しいものはどれか。'
+    choices:
+      - 'ルータを経由して、別のネットワークにある最終的な宛先までの経路を選ぶ'
+      - '同じネットワーク上で直接つながる機器に、MACアドレスを使ってフレームを届ける'
+      - 'ポート番号によって、機器の中のどのアプリケーション宛てかを識別する'
+      - 'ドメイン名を IPアドレスに変換する'
+    answer: 1
+    explanation: 'データリンク層は同じリンク上の隣接機器への伝送を担い、宛先は MACアドレス、データの単位はフレーム。アはインターネット層、ウはトランスポート層、エはアプリケーション層（DNS）の役割。'
+    level: ip
+  - q: '有線LAN（半二重の Ethernet）と無線LAN で使われるアクセス制御方式の組合せとして正しいものはどれか。'
+    choices: ['有線: CSMA/CD、無線: CSMA/CD', '有線: CSMA/CA、無線: CSMA/CD', '有線: CSMA/CD、無線: CSMA/CA', '有線: CSMA/CA、無線: CSMA/CA']
+    answer: 2
+    explanation: '有線LAN は衝突を検知（Collision Detection）する CSMA/CD、無線LAN は送信中の衝突を検知できないため衝突を回避（Collision Avoidance）する CSMA/CA を使う。'
+    level: fe
 ---
 
 データリンク層（TCP/IPモデルではネットワークインタフェース層）は、**同じネットワーク（リンク）上で直接つながる機器同士** がデータをやり取りするための層です。

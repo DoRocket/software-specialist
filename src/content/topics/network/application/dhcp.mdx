@@ -5,6 +5,48 @@ summary: IPアドレスやデフォルトゲートウェイなどのネットワ
 exams: [ip, fe, ap]
 tags: [プロトコル, 用語]
 related: [network/application/dns, network/ip/ip-address]
+quiz:
+  - q: 'DHCP によって端末に配布される情報に含まれないものはどれか。'
+    choices: ['IPアドレスとサブネットマスク', 'デフォルトゲートウェイの IPアドレス', 'DNSサーバの IPアドレス', '端末の NIC の MACアドレス']
+    answer: 3
+    explanation: 'MACアドレスは NIC ごとに割り当てられた識別子で、DHCP で配布するものではない（むしろ DHCP の予約では MACアドレスをもとに同じアドレスを割り当てる）。IPアドレス、デフォルトゲートウェイ、DNSサーバのアドレス、リース期間は DHCP で配布される。'
+    level: ip
+  - q: 'DHCP で IPアドレスが割り当てられるまでのメッセージの順序として正しいものはどれか。'
+    choices:
+      - 'DHCPDISCOVER → DHCPOFFER → DHCPREQUEST → DHCPACK'
+      - 'DHCPREQUEST → DHCPOFFER → DHCPDISCOVER → DHCPACK'
+      - 'DHCPDISCOVER → DHCPREQUEST → DHCPOFFER → DHCPACK'
+      - 'DHCPOFFER → DHCPDISCOVER → DHCPACK → DHCPREQUEST'
+    answer: 0
+    explanation: 'クライアントがサーバを探し（DISCOVER）、サーバが候補を提示し（OFFER）、クライアントが使うアドレスを要求し（REQUEST）、サーバが確定する（ACK）。頭文字をとって DORA と覚える。'
+    level: fe
+  - q: 'DHCPサーバとクライアントが別のネットワークにある場合に、DHCPリレーエージェントが必要になる理由として適切なものはどれか。'
+    choices:
+      - 'DHCP は TCP を使うため、ルータでコネクションを中継する必要があるから'
+      - 'リース期間の更新は、ルータからしか要求できないから'
+      - 'IPアドレスを持たないクライアントは最初の要求をブロードキャストで送り、ブロードキャストはルータを越えられないから'
+      - 'DNSサーバのアドレスは、ルータが代わりに配布する必要があるから'
+    answer: 2
+    explanation: 'DHCPDISCOVER などはブロードキャストで送られ、ルータで止まる。そこでルータや L3スイッチのリレーエージェント機能が DHCPサーバへ中継する。DHCP は TCP ではなく UDP を使う。'
+    level: ap
+  - q: 'DHCP の通信に使うプロトコルとポート番号の組合せとして正しいものはどれか。'
+    choices:
+      - 'TCP、サーバ 67番・クライアント 68番'
+      - 'UDP、サーバ 67番・クライアント 68番'
+      - 'UDP、サーバ 68番・クライアント 67番'
+      - 'UDP、サーバ・クライアントとも 53番'
+    answer: 1
+    explanation: 'DHCP は UDP を使い、サーバが 67番、クライアントが 68番。UDP の 53番は DNS のポート番号。'
+    level: fe
+  - q: 'LAN に無許可の DHCPサーバが接続され、偽のデフォルトゲートウェイを配布されることへの対策として適切なものはどれか。'
+    choices:
+      - 'スイッチの DHCPスヌーピング機能で、許可したポート以外からの DHCPサーバの応答を遮断する'
+      - 'DNSSEC を導入する'
+      - 'DHCP のリース期間を長くする'
+      - 'DHCPリレーエージェントを設定する'
+    answer: 0
+    explanation: '不正DHCPサーバへの対策にはスイッチの DHCPスヌーピングなどを使う。DNSSEC は DNS 応答の改ざん検証の仕組み、リース期間やリレーエージェントの設定は不正サーバからの応答を防がない。'
+    level: ap
 ---
 
 import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.astro';

@@ -5,6 +5,36 @@ summary: HTTP/HTTPS、メール（SMTP・POP3・IMAP）、FTP、SSH、NTP、SNMP
 exams: [ip, fe, ap]
 tags: [頻出, プロトコル, 用語]
 related: [network/transport/tcp-udp, network/application/dns]
+quiz:
+  - q: 'スマートフォンと PC の両方で、同じメールの既読状態やフォルダ分けを共有して読みたい。受信に使うプロトコルとして適切なものはどれか。'
+    choices: ['SMTP', 'IMAP4', 'POP3', 'MIME']
+    answer: 1
+    explanation: 'IMAP4 はメールをサーバ上で管理したまま読むため、複数の端末で同じ状態を共有できる。POP3 は端末にダウンロードして読み、基本的にサーバから削除する。SMTP は送信・転送、MIME は日本語や添付ファイルを扱うための規格。'
+    level: ip
+  - q: 'HTTPS の説明として正しいものはどれか。'
+    choices:
+      - 'HTTP の通信を TLS で暗号化し、サーバ証明書で接続先が本物であることを確認できる'
+      - 'HTTP に状態を持たせ、ログイン状態を管理できるようにした規格である'
+      - '公開鍵暗号を使って、メール本文の暗号化とデジタル署名を行う'
+      - 'ネットワーク上の機器の時刻を同期する'
+    answer: 0
+    explanation: 'HTTPS は HTTP を TLS で暗号化して盗聴・改ざんを防ぎ、サーバ証明書で接続先の真正性を確認する。ログイン状態の管理は Cookie やセッションID、ウは S/MIME、エは NTP の説明。'
+    level: ip
+  - q: 'Webサーバが一時的に過負荷でリクエストを処理できないときに返す `503 Service Unavailable` は、どの分類のステータスコードか。'
+    choices: ['成功', 'リダイレクト', 'クライアントエラー', 'サーバエラー']
+    answer: 3
+    explanation: '500番台はサーバエラーで、503 はサーバが一時的に応答できないことを表す。200番台は成功、300番台はリダイレクト、400番台（404 Not Found など）はクライアントエラー。'
+    level: fe
+  - q: '遠隔地のコンピュータにログインして操作するとき、通信路が暗号化されるプロトコルはどれか。'
+    choices: ['Telnet', 'FTP', 'SNMP', 'SSH']
+    answer: 3
+    explanation: 'SSH は暗号化された通信路で遠隔ログインでき、SFTP や SCP でファイル転送にも使える。Telnet も遠隔ログインのプロトコルだが通信が暗号化されない。FTP はファイル転送用で暗号化されず、SNMP は機器の監視用。'
+    level: ip
+  - q: 'ネットワーク機器の状態を監視・管理し、管理対象の機器から異常をトラップで通知できるプロトコルはどれか。'
+    choices: ['NTP', 'SMTP', 'SNMP', 'FTP']
+    answer: 2
+    explanation: 'SNMP は機器の監視・管理に使い、エージェントがトラップで異常を通知できる。NTP は時刻同期、SMTP はメールの送信・転送、FTP はファイル転送のプロトコル。'
+    level: fe
 ---
 
 アプリケーション層には用途ごとに多くのプロトコルがあります。ここでは試験で頻出のものを用途別に整理します。
