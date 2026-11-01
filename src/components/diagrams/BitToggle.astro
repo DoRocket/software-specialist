@@ -1,0 +1,290 @@
+---
+/**
+ * 8ビットの 2進数をクリックで操作し、各桁の重みと 10進・16進・2進の値を即時表示する部品。
+ * 10進数を入力するとビットに反映される（双方向）。
+ *
+ * 使い方（.mdx）:
+ *   <BitToggle title="8ビットの重み" initial={45} />
+ *   <BitToggle title="2の補数" signed initial={-10} />
+ * - signed: true で 2の補数モード（最上位ビットの重みが −128 になり、範囲は −128〜127）
+ * - initial: 初期値（符号なしなら 0〜255、signed なら −128〜127）
+ */
+import Figure from './Figure.astro';
+
+interface Props {
+  title?: string;
+  caption?: string;
+  signed?: boolean;
+  initial?: number;
+}
+const { title, caption, signed = false, initial = 0 } = Astro.props;
+const weights = [128, 64, 32, 16, 8, 4, 2, 1];
+const min = signed ? -128 : 0;
+const max = signed ? 127 : 255;
+const start = Math.max(min, Math.min(max, Math.trunc(initial)));
+const startBits = start & 0xff;
+---
+
+<Figure title={title} caption={caption}>
+  <div class="bt" data-bit-toggle data-signed={signed ? '1' : '0'} data-initial={startBits}>
+    <div class="bt-grid" role="group" aria-label="8ビット（クリックで 0 と 1 を切り替え）">
+      <span class="bt-rowhead">重み</span>
+      {
+        weights.map((w, i) => (
+          <span class:list={['bt-weight', { 'bt-neg': signed && i === 0, 'bt-nib': i === 4 }]}>
+            {signed && i === 0 ? '−128' : w}
+          </span>
+        ))
+      }
+      <span class="bt-rowhead">ビット</span>
+      {
+        weights.map((w, i) => (
+          <button
+            type="button"
+            class:list={['bt-bit', 'dg-mono', { 'bt-msb': signed && i === 0, 'bt-nib': i === 4 }]}
+            data-bit={7 - i}
+            aria-pressed={(startBits >> (7 - i)) & 1 ? 'true' : 'false'}
+            aria-label={`重み ${signed && i === 0 ? -128 : w} のビット`}
+          >
+            {(startBits >> (7 - i)) & 1}
+          </button>
+        ))
+      }
+      <span class="bt-rowhead">値</span>
+      {weights.map((_, i) => <span class:list={['bt-contrib', 'dg-mono', { 'bt-nib': i === 4 }]} data-contrib={7 - i} />)}
+    </div>
+    {signed && <p class="bt-note">最上位ビット（符号ビット）だけ重みが <strong>−128</strong> です。1 にすると値が負になります。</p>}
+
+    <p class="bt-sum dg-mono" data-sum aria-live="polite"></p>
+
+    <div class="dg-controls bt-controls">
+      <label>
+        10進数を入力
+        <input type="number" inputmode="numeric" min={min} max={max} step="1" value={start} data-dec />
+      </label>
+      {
+        signed ? (
+          <>
+            <button type="button" data-act="invert">全ビット反転</button>
+            <button type="button" data-act="inc">＋1</button>
+          </>
+        ) : (
+          <>
+            <button type="button" data-act="shl">左シフト（×2）</button>
+            <button type="button" data-act="shr">右シフト（÷2）</button>
+          </>
+        )
+      }
+      <button type="button" data-act="clear">0 に戻す</button>
+    </div>
+    <p class="bt-error" data-error hidden>{min} 〜 {max} の整数を入力してください。</p>
+
+    <dl class="dg-result bt-values">
+      <div><dt>10進数</dt><dd class="dg-mono" data-out="dec"></dd></div>
+      <div><dt>16進数</dt><dd class="dg-mono" data-out="hex"></dd></div>
+      <div><dt>2進数</dt><dd class="dg-mono" data-out="bin"></dd></div>
+      {signed && <div><dt>符号なしとして読むと</dt><dd class="dg-mono" data-out="unsigned"></dd></div>}
+    </dl>
+  </div>
+</Figure>
+
+<script>
+  function setup(root: HTMLElement) {
+    const signed = root.dataset.signed === '1';
+    let value = Number(root.dataset.initial ?? 0) & 0xff; // 0〜255 のビット列として保持
+    const bitBtns = [...root.querySelectorAll<HTMLButtonElement>('[data-bit]')];
+    const contribs = [...root.querySelectorAll<HTMLElement>('[data-contrib]')];
+    const input = root.querySelector<HTMLInputElement>('[data-dec]')!;
+    const error = root.querySelector<HTMLElement>('[data-error]')!;
+    const sum = root.querySelector<HTMLElement>('[data-sum]')!;
+    const out = (k: string) => root.querySelector<HTMLElement>(`[data-out="${k}"]`);
+
+    const weightOf = (b: number) => (signed && b === 7 ? -128 : 1 << b);
+    const asNumber = (v: number) => (signed && v & 0x80 ? v - 256 : v);
+
+    const render = (fromInput = false) => {
+      const terms: string[] = [];
+      for (const btn of bitBtns) {
+        const b = Number(btn.dataset.bit);
+        const on = (value >> b) & 1;
+        btn.textContent = String(on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        if (on) terms.push(String(weightOf(b)));
+      }
+      for (const c of contribs) {
+        const b = Number(c.dataset.contrib);
+        const on = (value >> b) & 1;
+        c.textContent = on ? String(weightOf(b)).replace('-', '−') : '0';
+        c.classList.toggle('is-on', !!on);
+      }
+      const n = asNumber(value);
+      const expr = terms.length
+        ? terms
+            .map((t, i) => (i === 0 ? t : t.startsWith('-') ? `− ${t.slice(1)}` : `+ ${t}`))
+            .join(' ')
+            .replace(/^-/, '−')
+        : '0';
+      sum.textContent = `${expr} = ${String(n).replace('-', '−')}`;
+      const bin = value.toString(2).padStart(8, '0');
+      out('dec')!.textContent = String(n).replace('-', '−');
+      out('hex')!.textContent = value.toString(16).toUpperCase().padStart(2, '0');
+      out('bin')!.textContent = `${bin.slice(0, 4)} ${bin.slice(4)}`;
+      const u = out('unsigned');
+      if (u) u.textContent = String(value);
+      if (!fromInput) input.value = String(n);
+      error.hidden = true;
+    };
+
+    root.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+      const bit = t.closest<HTMLButtonElement>('[data-bit]');
+      if (bit) {
+        value ^= 1 << Number(bit.dataset.bit);
+        render();
+        return;
+      }
+      const act = t.closest<HTMLButtonElement>('[data-act]')?.dataset.act;
+      if (!act) return;
+      if (act === 'invert') value = ~value & 0xff;
+      if (act === 'inc') value = (value + 1) & 0xff;
+      if (act === 'shl') value = (value << 1) & 0xff;
+      if (act === 'shr') value = value >> 1;
+      if (act === 'clear') value = 0;
+      render();
+    });
+
+    input.addEventListener('input', () => {
+      const raw = input.value.trim();
+      const n = Number(raw);
+      const min = signed ? -128 : 0;
+      const max = signed ? 127 : 255;
+      if (raw === '' || !Number.isInteger(n) || n < min || n > max) {
+        error.hidden = raw === '';
+        return;
+      }
+      value = n & 0xff;
+      render(true);
+    });
+
+    render();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-bit-toggle]').forEach(setup);
+</script>
+
+<style>
+  .bt-grid {
+    display: grid;
+    grid-template-columns: auto repeat(8, minmax(0, 1fr));
+    gap: 4px;
+    align-items: center;
+    max-width: 560px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .bt-rowhead {
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+    text-align: right;
+    padding-right: 4px;
+    white-space: nowrap;
+  }
+  .bt-weight {
+    font-size: 0.82rem;
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .bt-weight.bt-neg {
+    color: var(--dg-warn);
+    font-weight: 700;
+  }
+  .bt-nib {
+    margin-left: 6px;
+  }
+  .bt-bit {
+    font-size: 1.25rem;
+    font-weight: 700;
+    padding: 6px 0;
+    min-height: 44px;
+    border-radius: 8px;
+    border: 1.5px solid var(--dg-stroke);
+    background: var(--bg);
+    color: var(--fg-muted);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .bt-bit[aria-pressed='true'] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-fg);
+  }
+  .bt-bit.bt-msb {
+    border-color: var(--dg-warn);
+  }
+  .bt-bit.bt-msb[aria-pressed='true'] {
+    background: var(--dg-warn);
+    border-color: var(--dg-warn);
+    color: var(--bg);
+  }
+  .bt-bit:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .bt-contrib {
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+    opacity: 0.55;
+    font-variant-numeric: tabular-nums;
+  }
+  .bt-contrib.is-on {
+    color: var(--fg);
+    opacity: 1;
+    font-weight: 700;
+  }
+  .bt-note {
+    margin: 8px 0 0;
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+    text-align: center;
+  }
+  .bt-sum {
+    margin: 10px 0 12px;
+    text-align: center;
+    font-size: 0.95rem;
+    overflow-wrap: anywhere;
+  }
+  .bt-controls input {
+    width: 7em;
+    margin-left: 4px;
+  }
+  .bt-error {
+    margin: -6px 0 10px;
+    font-size: 0.85rem;
+    color: var(--dg-warn);
+  }
+  .bt-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 24px;
+    margin: 0;
+  }
+  .bt-values div {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+  }
+  .bt-values dt {
+    font-size: 0.82rem;
+    color: var(--fg-muted);
+  }
+  .bt-values dd {
+    margin: 0;
+    font-weight: 700;
+    font-size: 1.05rem;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bt-bit {
+      transition: none;
+    }
+  }
+</style>

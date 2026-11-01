@@ -1,0 +1,274 @@
+---
+/**
+ * 半加算器の回路図（A, B → XOR が和 S、AND が桁上がり C）。入力をクリックで切り替えると、
+ * 信号が通る配線・出力ランプ・真理値表の該当行が変わる。
+ *
+ * 使い方（.mdx）:
+ *   <HalfAdderCircuit title="半加算器を動かす" />
+ */
+import Figure from './Figure.astro';
+import { GATES } from './gate-shapes';
+
+interface Props {
+  title?: string;
+  caption?: string;
+}
+const { title, caption } = Astro.props;
+const X = GATES.XOR;
+const A = GATES.AND;
+// ゲートの配置（左上の座標）
+const xor = { x: 165, y: 30 };
+const and = { x: 170, y: 120 };
+const rows = [
+  [0, 0],
+  [0, 1],
+  [1, 0],
+  [1, 1],
+];
+---
+
+<Figure title={title} caption={caption}>
+  <div class="ha" data-half-adder>
+    <svg viewBox="0 0 370 205" class="ha-svg" role="img" aria-label="半加算器の回路図">
+      {/* A の配線: XOR の上側入力と、分岐して AND の上側入力へ */}
+      <path class="ha-wire" data-wire="A" d={`M54,45 H${xor.x + 8}`} />
+      <path class="ha-wire" data-wire="A" d={`M95,45 V135 H${and.x + 6}`} />
+      <circle class="ha-dot" data-wire="A" cx="95" cy="45" r="4" />
+      {/* B の配線: AND の下側入力と、分岐して XOR の下側入力へ */}
+      <path class="ha-wire" data-wire="B" d={`M54,165 H${and.x + 6}`} />
+      <path class="ha-wire" data-wire="B" d={`M125,165 V75 H${xor.x + 8}`} />
+      <circle class="ha-dot" data-wire="B" cx="125" cy="165" r="4" />
+      {/* 出力の配線 */}
+      <path class="ha-wire" data-wire="S" d={`M${xor.x + X.out},60 H284`} />
+      <path class="ha-wire" data-wire="C" d={`M${and.x + A.out},150 H284`} />
+
+      <g transform={`translate(${xor.x} ${xor.y})`}>
+        <path class="ha-body" d={X.body} />
+        <path class="ha-extra" d={X.extra} />
+        <text class="ha-gate-name" x="38" y="35" text-anchor="middle">XOR</text>
+      </g>
+      <g transform={`translate(${and.x} ${and.y})`}>
+        <path class="ha-body" d={A.body} />
+        <text class="ha-gate-name" x="30" y="35" text-anchor="middle">AND</text>
+      </g>
+
+      {
+        [
+          { k: 'A', y: 45 },
+          { k: 'B', y: 165 },
+        ].map(({ k, y }) => (
+          <g class="ha-in" data-in={k} role="button" tabindex="0" aria-label={`入力 ${k} を切り替える`}>
+            <text class="ha-label" x="10" y={y + 5}>
+              {k}
+            </text>
+            <circle class="ha-node" cx="40" cy={y} r="14" />
+            <text class="ha-val" x="40" y={y + 5} text-anchor="middle" data-val={k}>
+              0
+            </text>
+          </g>
+        ))
+      }
+      {
+        [
+          { k: 'S', y: 60, label: 'S（和）' },
+          { k: 'C', y: 150, label: 'C（桁上がり）' },
+        ].map(({ k, y, label }) => (
+          <g>
+            <circle class="ha-lamp" data-lamp={k} cx="300" cy={y} r="16" />
+            <text class="ha-val ha-lamp-val" data-lamp-val={k} x="300" y={y + 5} text-anchor="middle" data-val={k}>
+              0
+            </text>
+            <text class="ha-label ha-out-label" x="300" y={y + 34} text-anchor="middle">
+              {label}
+            </text>
+          </g>
+        ))
+      }
+    </svg>
+
+    <div class="ha-side">
+      <p class="ha-sum dg-mono" data-sum aria-live="polite"></p>
+      <table class="ha-table">
+        <thead>
+          <tr><th>A</th><th>B</th><th>C（桁上がり）</th><th>S（和）</th></tr>
+        </thead>
+        <tbody>
+          {
+            rows.map(([a, b]) => (
+              <tr data-row={`${a}${b}`}>
+                <td>{a}</td>
+                <td>{b}</td>
+                <td>{a & b}</td>
+                <td>{a ^ b}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="ha-hint">入力 A・B の丸をクリックすると 0 と 1 が切り替わります。S = A XOR B、C = A AND B です。</p>
+  </div>
+</Figure>
+
+<script>
+  function setup(root: HTMLElement) {
+    const v: Record<string, number> = { A: 0, B: 0, S: 0, C: 0 };
+    const render = () => {
+      v.S = v.A ^ v.B;
+      v.C = v.A & v.B;
+      root.querySelectorAll<SVGElement>('[data-wire]').forEach((w) => w.classList.toggle('is-on', v[w.dataset.wire!] === 1));
+      root.querySelectorAll<SVGTextElement>('[data-val]').forEach((t) => (t.textContent = String(v[t.dataset.val!])));
+      root.querySelectorAll<SVGElement>('[data-in]').forEach((g) => {
+        g.classList.toggle('is-on', v[g.dataset.in!] === 1);
+        g.setAttribute('aria-pressed', v[g.dataset.in!] ? 'true' : 'false');
+      });
+      root.querySelectorAll<SVGElement>('[data-lamp], [data-lamp-val]').forEach((l) => {
+        l.classList.toggle('is-on', v[(l.dataset.lamp ?? l.dataset.lampVal)!] === 1);
+      });
+      root.querySelectorAll<HTMLElement>('[data-row]').forEach((r) => r.classList.toggle('is-current', r.dataset.row === `${v.A}${v.B}`));
+      root.querySelector('[data-sum]')!.innerHTML = `${v.A} + ${v.B} = (${v.C}${v.S})<sub>2</sub> → C = ${v.C}、S = ${v.S}`;
+    };
+    const toggle = (k: string) => {
+      v[k] = 1 - v[k];
+      render();
+    };
+    root.addEventListener('click', (e) => {
+      const inp = (e.target as Element).closest<SVGElement>('[data-in]');
+      if (inp) toggle(inp.dataset.in!);
+    });
+    root.addEventListener('keydown', (e) => {
+      const inp = (e.target as Element).closest<SVGElement>('[data-in]');
+      if (inp && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        toggle(inp.dataset.in!);
+      }
+    });
+    render();
+  }
+  document.querySelectorAll<HTMLElement>('[data-half-adder]').forEach(setup);
+</script>
+
+<style>
+  .ha {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    align-items: center;
+  }
+  .ha svg.ha-svg {
+    flex: 1 1 340px;
+    max-width: 520px;
+  }
+  .ha-side {
+    flex: 0 1 auto;
+  }
+  .ha-wire {
+    fill: none;
+    stroke: var(--dg-stroke);
+    stroke-width: 3;
+    transition: stroke 0.2s ease;
+  }
+  .ha-wire.is-on {
+    stroke: var(--accent);
+    stroke-width: 4;
+  }
+  .ha-dot {
+    fill: var(--dg-stroke);
+  }
+  .ha-dot.is-on {
+    fill: var(--accent);
+  }
+  .ha-body {
+    fill: var(--dg-fill);
+    stroke: var(--fg);
+    stroke-width: 2;
+  }
+  .ha-extra {
+    fill: none;
+    stroke: var(--fg);
+    stroke-width: 2;
+  }
+  :global(.diagram-body) svg .ha-gate-name {
+    font-size: 12px;
+    font-weight: 700;
+    fill: var(--fg-muted);
+  }
+  .ha-in {
+    cursor: pointer;
+  }
+  .ha-in:focus {
+    outline: none;
+  }
+  .ha-in:focus-visible .ha-node {
+    stroke: var(--accent);
+    stroke-width: 3;
+  }
+  .ha-node {
+    fill: var(--bg);
+    stroke: var(--dg-stroke);
+    stroke-width: 2;
+  }
+  .ha-in.is-on .ha-node {
+    fill: var(--accent);
+    stroke: var(--accent);
+  }
+  :global(.diagram-body) svg .ha-val {
+    font-weight: 700;
+    font-size: 15px;
+    pointer-events: none;
+  }
+  :global(.diagram-body) svg .ha-in.is-on .ha-val {
+    fill: var(--accent-fg);
+  }
+  :global(.diagram-body) svg .ha-label {
+    font-weight: 700;
+  }
+  :global(.diagram-body) svg .ha-out-label {
+    font-size: 13px;
+  }
+  .ha-lamp {
+    fill: var(--bg);
+    stroke: var(--fg-muted);
+    stroke-width: 2;
+    transition: fill 0.2s ease;
+  }
+  .ha-lamp.is-on {
+    fill: var(--dg-c3);
+    stroke: var(--dg-c3);
+    filter: drop-shadow(0 0 6px var(--dg-c3));
+  }
+  :global(.diagram-body) svg .ha-lamp-val.is-on {
+    fill: #1d2330;
+  }
+  .ha-sum {
+    margin: 0 0 6px;
+    font-weight: 700;
+    font-size: 0.92rem;
+  }
+  :global(.prose) .ha-table {
+    display: table;
+    margin: 0;
+    font-size: 0.88rem;
+  }
+  :global(.prose) .ha-table th,
+  :global(.prose) .ha-table td {
+    padding: 3px 10px;
+    text-align: center;
+  }
+  :global(.prose) .ha-table tr.is-current td {
+    background: color-mix(in srgb, var(--accent) 22%, var(--bg));
+    font-weight: 700;
+  }
+  .ha-hint {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ha-wire,
+    .ha-lamp {
+      transition: none;
+    }
+  }
+</style>

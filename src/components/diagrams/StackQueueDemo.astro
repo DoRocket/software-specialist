@@ -1,0 +1,402 @@
+---
+/**
+ * スタック（LIFO）とキュー（FIFO）を並べて、要素の出し入れをアニメーションで見せる部品。
+ * 各パネルのボタンで自由に操作できるほか、「同じ操作を両方に」の列（ops）を 1 つずつ実行して
+ * 取り出し順の違いを比べられる。
+ *
+ * 使い方（.mdx）:
+ *   <StackQueueDemo title="スタックとキュー" ops={['push 1', 'push 2', 'pop', 'push 3', 'push 4', 'pop', 'pop']} />
+ * - ops: 'push n'（キューでは enqueue n）と 'pop'（キューでは dequeue）の列。省略可
+ * - capacity: 入れられる最大の個数（既定 6）
+ */
+import Figure from './Figure.astro';
+
+interface Props {
+  title?: string;
+  caption?: string;
+  ops?: string[];
+  capacity?: number;
+}
+const { title, caption, ops = [], capacity = 6 } = Astro.props;
+const parsed = ops.map((o) => {
+  const [op, v] = o.trim().split(/\s+/);
+  return op === 'push' ? { push: true, v: Number(v) } : { push: false, v: 0 };
+});
+---
+
+<Figure title={title} caption={caption}>
+  <div class="sq" data-stack-queue data-capacity={capacity} data-ops={JSON.stringify(parsed)}>
+    {
+      parsed.length > 0 && (
+        <div class="sq-script">
+          <div class="sq-ops" aria-label="両方に行う操作の列">
+            {parsed.map((o, i) => (
+              <span class="sq-op dg-mono" data-op={i}>
+                {o.push ? `push(${o.v})` : 'pop()'}
+              </span>
+            ))}
+          </div>
+          <div class="dg-controls sq-script-controls">
+            <button type="button" data-act="script-next">
+              次の操作を両方に実行 ›
+            </button>
+            <button type="button" data-act="script-reset">
+              ⟲ 最初から
+            </button>
+            <span class="sq-script-note">スタックの push / pop は、キューでは enqueue / dequeue として実行します。</span>
+          </div>
+        </div>
+      )
+    }
+
+    <div class="sq-panels">
+      <section class="sq-panel" data-kind="stack" aria-label="スタック">
+        <h4 class="sq-head">スタック <span>後入れ先出し（LIFO）</span></h4>
+        <div class="dg-controls sq-btns">
+          <button type="button" data-act="add">push</button>
+          <button type="button" data-act="remove">pop</button>
+        </div>
+        <div class="sq-stack-wrap">
+          <div class="sq-stack-io" aria-hidden="true">⇅ 出し入れは上（トップ）だけ</div>
+          <div class="sq-stack" data-box style={`--cap: ${capacity}`}></div>
+        </div>
+        <p class="sq-log" data-log aria-live="polite">空のスタックです。</p>
+        <p class="sq-order">取り出した順: <span class="dg-mono" data-order>—</span></p>
+      </section>
+
+      <section class="sq-panel" data-kind="queue" aria-label="キュー">
+        <h4 class="sq-head">キュー <span>先入れ先出し（FIFO）</span></h4>
+        <div class="dg-controls sq-btns">
+          <button type="button" data-act="add">enqueue</button>
+          <button type="button" data-act="remove">dequeue</button>
+        </div>
+        <div class="sq-queue-wrap">
+          <div class="sq-queue-ends" aria-hidden="true">
+            <span>← 取り出し（先頭）</span>
+            <span>追加（末尾）←</span>
+          </div>
+          <div class="sq-queue" data-box style={`--cap: ${capacity}`}></div>
+        </div>
+        <p class="sq-log" data-log aria-live="polite">空のキューです。</p>
+        <p class="sq-order">取り出した順: <span class="dg-mono" data-order>—</span></p>
+      </section>
+    </div>
+  </div>
+</Figure>
+
+<script>
+  type Op = { push: boolean; v: number };
+  const reduce = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  class Panel {
+    items: number[] = [];
+    order: number[] = [];
+    next = 1;
+    constructor(
+      readonly el: HTMLElement,
+      readonly cap: number,
+    ) {}
+    get isStack() {
+      return this.el.dataset.kind === 'stack';
+    }
+    get box() {
+      return this.el.querySelector<HTMLElement>('[data-box]')!;
+    }
+    log(text: string) {
+      this.el.querySelector<HTMLElement>('[data-log]')!.textContent = text;
+    }
+    renderOrder() {
+      this.el.querySelector<HTMLElement>('[data-order]')!.textContent = this.order.length ? this.order.join(', ') : '—';
+    }
+    add(v = this.next) {
+      const name = this.isStack ? 'push' : 'enqueue';
+      if (this.items.length >= this.cap) {
+        this.log(`いっぱいです（最大 ${this.cap} 個）。先に取り出してください。`);
+        return;
+      }
+      this.items.push(v);
+      this.next = Math.max(this.next, v + 1);
+      const node = document.createElement('div');
+      node.className = 'sq-item dg-mono';
+      node.textContent = String(v);
+      if (!reduce()) node.classList.add('is-entering');
+      this.box.append(node);
+      this.mark();
+      this.log(`${name}(${v}): ${v} を${this.isStack ? '一番上に積みました' : '末尾に並べました'}。`);
+    }
+    remove() {
+      const name = this.isStack ? 'pop' : 'dequeue';
+      if (!this.items.length) {
+        this.log(`${name}: 空なので取り出せません。`);
+        return;
+      }
+      const v = this.isStack ? this.items.pop()! : this.items.shift()!;
+      this.order.push(v);
+      const nodes = [...this.box.querySelectorAll<HTMLElement>('.sq-item:not(.is-leaving)')];
+      const node = this.isStack ? nodes[nodes.length - 1] : nodes[0];
+      if (reduce()) node.remove();
+      else {
+        node.classList.remove('is-entering');
+        node.classList.add('is-leaving');
+        node.addEventListener('animationend', () => node.remove(), { once: true });
+      }
+      this.mark();
+      this.renderOrder();
+      this.log(
+        `${name}(): ${this.isStack ? '一番上（最後に入れた）' : '先頭（最初に入れた）'} ${v} を取り出しました。`,
+      );
+    }
+    /** 次に取り出される要素に印を付ける */
+    mark() {
+      const nodes = [...this.box.querySelectorAll<HTMLElement>('.sq-item:not(.is-leaving)')];
+      nodes.forEach((n) => n.classList.remove('is-next'));
+      const target = this.isStack ? nodes[nodes.length - 1] : nodes[0];
+      target?.classList.add('is-next');
+    }
+    reset() {
+      this.items = [];
+      this.order = [];
+      this.next = 1;
+      this.box.replaceChildren();
+      this.renderOrder();
+      this.log(this.isStack ? '空のスタックです。' : '空のキューです。');
+    }
+  }
+
+  function setup(root: HTMLElement) {
+    const cap = Number(root.dataset.capacity ?? 6);
+    const ops: Op[] = JSON.parse(root.dataset.ops ?? '[]');
+    const panels = [...root.querySelectorAll<HTMLElement>('.sq-panel')].map((el) => new Panel(el, cap));
+    let pos = 0;
+    const nextBtn = root.querySelector<HTMLButtonElement>('[data-act="script-next"]');
+
+    const renderScript = () => {
+      root.querySelectorAll<HTMLElement>('[data-op]').forEach((o) => {
+        const i = Number(o.dataset.op);
+        o.classList.toggle('is-done', i < pos);
+        o.classList.toggle('is-current', i === pos - 1);
+      });
+      if (nextBtn) nextBtn.disabled = pos >= ops.length;
+    };
+
+    root.addEventListener('click', (e) => {
+      const btn = (e.target as Element).closest<HTMLButtonElement>('[data-act]');
+      if (!btn) return;
+      const act = btn.dataset.act;
+      if (act === 'script-next' && pos < ops.length) {
+        if (pos === 0) panels.forEach((p) => p.reset());
+        const op = ops[pos++];
+        panels.forEach((p) => (op.push ? p.add(op.v) : p.remove()));
+        renderScript();
+        return;
+      }
+      if (act === 'script-reset') {
+        pos = 0;
+        panels.forEach((p) => p.reset());
+        renderScript();
+        return;
+      }
+      const panel = panels.find((p) => p.el.contains(btn));
+      if (!panel) return;
+      if (act === 'add') panel.add();
+      if (act === 'remove') panel.remove();
+    });
+    renderScript();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-stack-queue]').forEach(setup);
+</script>
+
+<style>
+  .sq {
+    --item: 44px;
+    --gap: 6px;
+  }
+  .sq-script {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed var(--border);
+  }
+  .sq-ops {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .sq-op {
+    padding: 2px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+  }
+  .sq-op.is-done {
+    color: var(--fg);
+  }
+  .sq-op.is-current {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-weight: 700;
+  }
+  .sq-script-controls {
+    margin-bottom: 0;
+  }
+  .sq-script-controls button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  .sq-script-note {
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+  .sq-panels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+  }
+  .sq-panel {
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    min-width: 0;
+  }
+  .sq-head {
+    margin: 0 0 8px;
+    font-size: 1rem;
+  }
+  .sq-head span {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--fg-muted);
+    margin-left: 6px;
+  }
+  .sq-btns {
+    margin-bottom: 10px;
+  }
+  .sq-stack-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .sq-stack-io,
+  .sq-queue-ends {
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+  }
+  .sq-stack {
+    display: flex;
+    flex-direction: column-reverse;
+    justify-content: flex-start;
+    align-items: center;
+    width: 96px;
+    height: calc(var(--cap) * (var(--item) * 0.8 + var(--gap)) + 10px);
+    padding: 4px 6px 6px;
+    border: 3px solid var(--dg-stroke);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    overflow: hidden;
+  }
+  .sq-stack :global(.sq-item) {
+    width: 100%;
+    height: calc(var(--item) * 0.8);
+    margin-top: var(--gap);
+  }
+  .sq-queue-wrap {
+    overflow: hidden;
+  }
+  .sq-queue-ends {
+    display: flex;
+    justify-content: space-between;
+  }
+  .sq-queue {
+    display: flex;
+    align-items: center;
+    height: calc(var(--item) + 16px);
+    padding: 0 6px;
+    border-top: 3px solid var(--dg-stroke);
+    border-bottom: 3px solid var(--dg-stroke);
+    overflow: hidden;
+  }
+  .sq-queue :global(.sq-item) {
+    flex: none;
+    width: var(--item);
+    height: var(--item);
+    margin-right: var(--gap);
+  }
+  .sq :global(.sq-item) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: var(--dg-fill);
+    border: 2px solid var(--dg-c1);
+    color: var(--fg);
+    font-weight: 700;
+    box-sizing: border-box;
+  }
+  .sq :global(.sq-item.is-next) {
+    border-color: var(--dg-warn);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--dg-warn) 30%, transparent);
+  }
+  .sq-stack :global(.sq-item.is-entering) {
+    animation: sq-stack-in 0.4s ease;
+  }
+  .sq-stack :global(.sq-item.is-leaving) {
+    animation: sq-stack-out 0.45s ease forwards;
+  }
+  .sq-queue :global(.sq-item.is-entering) {
+    animation: sq-queue-in 0.4s ease;
+  }
+  .sq-queue :global(.sq-item.is-leaving) {
+    animation: sq-queue-out 0.45s ease forwards;
+  }
+  @keyframes sq-stack-in {
+    from {
+      transform: translateY(-120px);
+      opacity: 0;
+    }
+  }
+  @keyframes sq-stack-out {
+    to {
+      transform: translateY(-120px);
+      opacity: 0;
+    }
+  }
+  @keyframes sq-queue-in {
+    from {
+      transform: translateX(160px);
+      opacity: 0;
+    }
+  }
+  @keyframes sq-queue-out {
+    to {
+      transform: translateX(-60px);
+      opacity: 0;
+      width: 0;
+      margin-right: 0;
+      border-width: 0;
+    }
+  }
+  .sq-log {
+    margin: 10px 0 2px;
+    min-height: 2.8em;
+    font-size: 0.85rem;
+  }
+  .sq-order {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+  }
+  .sq-order span {
+    color: var(--fg);
+    font-weight: 700;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sq :global(.sq-item) {
+      animation: none !important;
+    }
+  }
+</style>

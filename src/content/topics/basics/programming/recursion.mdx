@@ -7,6 +7,8 @@ tags: [アルゴリズム, プログラミング, データ構造, 頻出]
 related: [basics/programming/pseudo-code, basics/algorithms/data-structures, basics/algorithms/sorting]
 ---
 
+import CallStackDiagram from '../../../../components/diagrams/CallStackDiagram.astro';
+
 **再帰** とは、関数（または手続）の処理の中で自分自身を呼び出すことです（**再帰呼出し**）。
 「大きな問題を、同じ形をした小さな問題に分けて解く」アルゴリズムを短く書けるため、クイックソート・マージソート（分割統治法）や木の走査などで使われます。
 
@@ -18,8 +20,8 @@ related: [basics/programming/pseudo-code, basics/algorithms/data-structures, bas
 
 | 部分 | 役割 | 階乗 n! の場合 |
 | --- | --- | --- |
-| 基底条件（終了条件） | それ以上自分を呼ばずに値を返す | n ≦ 1 なら 1 を返す |
-| 再帰ステップ | 問題を小さくして自分自身を呼び出す | n × (n − 1)! を返す |
+| 基底条件（終了条件） | それ以上自分を呼ばずに値を返す | $n \leqq 1$ なら 1 を返す |
+| 再帰ステップ | 問題を小さくして自分自身を呼び出す | $n \times (n - 1)!$ を返す |
 
 基底条件がない、または引数が基底条件に近づかないと、呼出しが無限に続いてしまいます。
 
@@ -56,14 +58,31 @@ fact(4) = 4 × 6 = 24
 
 呼出しの途中では掛け算は行われず、基底条件に達してから **戻りながら** 計算が進む点がポイントです。
 
+このときのスタックの動きを、ステップごとに見てみましょう。
+
+<CallStackDiagram
+  title="fact(4) の呼出しスタック"
+  intro="fact(4) を呼び出すと、呼出しのたびに引数 n を持った新しい領域がスタックに積まれ、戻るときに取り出されます。"
+  steps={[
+    { stack: [{ name: 'fact(4)', state: 'n = 4：4 × fact(3) の結果待ち' }], note: 'fact(4) を呼び出す。n = 4 は基底条件ではないので、4 × fact(3) を計算するために fact(3) を呼び出す（掛け算はまだしない）。' },
+    { stack: [{ name: 'fact(4)', state: 'n = 4：4 × fact(3) の結果待ち' }, { name: 'fact(3)', state: 'n = 3：3 × fact(2) の結果待ち' }], note: 'fact(3) がスタックに積まれる。同じように fact(2) を呼び出す。' },
+    { stack: [{ name: 'fact(4)', state: 'n = 4：4 × fact(3) の結果待ち' }, { name: 'fact(3)', state: 'n = 3：3 × fact(2) の結果待ち' }, { name: 'fact(2)', state: 'n = 2：2 × fact(1) の結果待ち' }], note: 'fact(2) が積まれ、fact(1) を呼び出す。' },
+    { stack: [{ name: 'fact(4)', state: 'n = 4：4 × fact(3) の結果待ち' }, { name: 'fact(3)', state: 'n = 3：3 × fact(2) の結果待ち' }, { name: 'fact(2)', state: 'n = 2：2 × fact(1) の結果待ち' }, { name: 'fact(1)', state: 'n = 1：基底条件なので 1 を返す' }], note: 'fact(1) は基底条件（n ≦ 1）に当たるので、それ以上呼び出さずに 1 を返す。ここから戻りが始まる。' },
+    { stack: [{ name: 'fact(4)', state: 'n = 4：4 × fact(3) の結果待ち' }, { name: 'fact(3)', state: 'n = 3：3 × fact(2) の結果待ち' }, { name: 'fact(2)', state: '2 × 1 = 2 を返す' }], ret: '1', note: '最後に積まれた fact(1) が取り出され、戻り値 1 が fact(2) に渡る。fact(2) は 2 × 1 = 2 を計算する。' },
+    { stack: [{ name: 'fact(4)', state: 'n = 4：4 × fact(3) の結果待ち' }, { name: 'fact(3)', state: '3 × 2 = 6 を返す' }], ret: '2', note: 'fact(2) が取り出され、戻り値 2 が fact(3) に渡る。fact(3) は 3 × 2 = 6 を計算する。' },
+    { stack: [{ name: 'fact(4)', state: '4 × 6 = 24 を返す' }], ret: '6', note: 'fact(3) が取り出され、戻り値 6 が fact(4) に渡る。fact(4) は 4 × 6 = 24 を計算する。' },
+    { stack: [], ret: '24', note: 'fact(4) も取り出され、呼出し元に 24 が返る。スタックは空に戻る。最後に積んだものから先に取り出された（後入れ先出し、LIFO）。' },
+  ]}
+/>
+
 ## 代表的な再帰
 
 | 例 | 定義 |
 | --- | --- |
-| 階乗 | n! = n × (n − 1)!、1! = 1 |
-| フィボナッチ数 | fib(n) = fib(n − 1) + fib(n − 2)、fib(1) = fib(2) = 1 |
-| 最大公約数（ユークリッドの互除法） | gcd(a, b) = gcd(b, a mod b)、b = 0 なら a |
-| ハノイの塔 | n 枚の移動回数は 2^n − 1 回 |
+| 階乗 | $n! = n \times (n - 1)!$、$1! = 1$ |
+| フィボナッチ数 | $\mathrm{fib}(n) = \mathrm{fib}(n - 1) + \mathrm{fib}(n - 2)$、$\mathrm{fib}(1) = \mathrm{fib}(2) = 1$ |
+| 最大公約数（ユークリッドの互除法） | $\gcd(a, b) = \gcd(b,\ a \bmod b)$、$b = 0$ なら $a$ |
+| ハノイの塔 | n 枚の移動回数は $2^n - 1$ 回 |
 
 フィボナッチ数を上の定義どおり再帰で求めると、同じ値を何度も計算し直すため、呼出し回数が n に対して指数関数的に増えます。
 
@@ -94,7 +113,7 @@ fib(5)
     └─ fib(1)
 ```
 
-戻り値は fib(5) = fib(4) + fib(3) = 3 + 2 = **5**。木の節の数を数えると呼出し回数は **9 回** です（fib(3) を 2 回計算している無駄が分かります）。
+戻り値は $\mathrm{fib}(5) = \mathrm{fib}(4) + \mathrm{fib}(3) = 3 + 2 =$ **5**。木の節の数を数えると呼出し回数は **9 回** です（fib(3) を 2 回計算している無駄が分かります）。
 
 **例題2** gcd(48, 18) を、gcd(a, b) = 「b ＝ 0 なら a、そうでなければ gcd(b, a mod b)」で求めよ。
 

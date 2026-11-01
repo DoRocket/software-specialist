@@ -1,0 +1,293 @@
+---
+/**
+ * 二分探索のステップ再生。整列済み配列と探す値を指定すると、lo / mid / hi が 1 回の比較ごとに動き、
+ * 比較回数を数える。同じ値を線形探索で探した場合の比較回数も並べて表示する。
+ *
+ * 使い方（.mdx）:
+ *   <BinarySearchDemo title="二分探索" values={[3, 8, 12, 17, 21, 25, 30]} target={25} />
+ * - values: 昇順に整列済みの配列（「例題の配列」でこれに戻る）
+ * - target: 最初に探す値
+ * - sizes: 「要素数」で選べる大きさ（既定 [15, 31]。例題の配列に加えて、ランダムな整列済み配列を作る）
+ */
+import Figure from './Figure.astro';
+
+interface Props {
+  title?: string;
+  caption?: string;
+  values?: number[];
+  target?: number;
+  sizes?: number[];
+}
+const { title, caption, values = [3, 8, 12, 17, 21, 25, 30], target = values[0], sizes = [15, 31] } = Astro.props;
+---
+
+<Figure title={title} caption={caption}>
+  <div class="bs" data-binary-search data-values={JSON.stringify(values)} data-target={target}>
+    <div class="dg-controls">
+      <label>
+        探す値
+        <input type="number" step="1" value={target} data-target-input />
+      </label>
+      <label>
+        配列
+        <select data-size>
+          <option value="sample">例題の配列（{values.length} 個）</option>
+          {sizes.map((s) => <option value={s}>ランダム（{s} 個）</option>)}
+        </select>
+      </label>
+    </div>
+
+    <ol class="bs-cells" data-cells aria-label="整列済みの配列"></ol>
+
+    <div class="bs-stats">
+      <span>二分探索の比較 <strong class="dg-mono" data-comps>0</strong> 回</span>
+      <span class="bs-linear">線形探索なら <strong class="dg-mono" data-linear></strong> 回</span>
+      <span class="bs-max">（二分探索の最大 <span class="dg-mono" data-max></span> 回）</span>
+    </div>
+
+    <div class="diagram-narration" aria-live="polite"><p data-note></p></div>
+    <div class="diagram-controls">
+      <button type="button" data-act="reset" aria-label="最初に戻す">⟲</button>
+      <button type="button" data-act="prev" aria-label="前のステップ">‹ 前へ</button>
+      <button type="button" data-act="play" aria-pressed="false">▶ 再生</button>
+      <button type="button" data-act="next" aria-label="次のステップ">次へ ›</button>
+      <span class="diagram-count" data-count>0 / 0</span>
+    </div>
+  </div>
+</Figure>
+
+<script>
+  type Frame = { lo: number; hi: number; mid?: number; found?: number; comps: number; note: string };
+  const INTERVAL_MS = 1500;
+
+  function trace(a: number[], t: number): Frame[] {
+    const frames: Frame[] = [];
+    let lo = 0;
+    let hi = a.length - 1;
+    let comps = 0;
+    frames.push({ lo, hi, comps, note: `${t} を探す。最初の探索範囲は配列全体（lo = 0、hi = ${hi}）。` });
+    while (lo <= hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      comps++;
+      const v = a[mid];
+      const head = `mid = (${lo} + ${hi}) ÷ 2 = ${mid}（切捨て）。data[${mid}] = ${v} と ${t} を比較する（${comps} 回目）。`;
+      if (v === t) {
+        frames.push({ lo, hi, mid, found: mid, comps, note: `${head}一致したので発見。` });
+        return frames;
+      }
+      if (v < t) {
+        frames.push({ lo, hi, mid, comps, note: `${head}${v} < ${t} なので右半分へ: lo = ${mid} + 1 = ${mid + 1}。` });
+        lo = mid + 1;
+      } else {
+        frames.push({ lo, hi, mid, comps, note: `${head}${v} > ${t} なので左半分へ: hi = ${mid} − 1 = ${mid - 1}。` });
+        hi = mid - 1;
+      }
+    }
+    frames.push({ lo, hi, comps, note: `lo = ${lo} > hi = ${hi} となり、探索範囲がなくなった。${t} は配列にない（比較 ${comps} 回）。` });
+    return frames;
+  }
+
+  function randomSorted(n: number): number[] {
+    const set = new Set<number>();
+    const top = n * 4;
+    while (set.size < n) set.add(1 + Math.floor(Math.random() * top));
+    return [...set].sort((x, y) => x - y);
+  }
+
+  function setup(root: HTMLElement) {
+    const sample: number[] = JSON.parse(root.dataset.values ?? '[]');
+    let data = sample.slice();
+    let target = Number(root.dataset.target ?? data[0]);
+    let frames: Frame[] = [];
+    let cur = 0;
+    let timer: number | undefined;
+    const cellsEl = root.querySelector<HTMLOListElement>('[data-cells]')!;
+    const input = root.querySelector<HTMLInputElement>('[data-target-input]')!;
+    const size = root.querySelector<HTMLSelectElement>('[data-size]')!;
+    const playBtn = root.querySelector<HTMLButtonElement>('[data-act="play"]')!;
+    const q = (s: string) => root.querySelector<HTMLElement>(s)!;
+
+    const buildCells = () => {
+      cellsEl.replaceChildren(
+        ...data.map((v, i) => {
+          const li = document.createElement('li');
+          li.className = 'bs-cell';
+          li.innerHTML = `<span class="bs-idx">${i}</span><span class="bs-val">${v}</span><span class="bs-ptr"></span>`;
+          return li;
+        }),
+      );
+    };
+
+    const build = () => {
+      frames = trace(data, target);
+      cur = 0;
+      const idx = data.indexOf(target);
+      q('[data-linear]').textContent = String(idx >= 0 ? idx + 1 : data.length);
+      q('.bs-linear').title = idx >= 0 ? '先頭から順に比べて見つかるまでの回数' : '最後まで比べて見つからない';
+      q('[data-max]').textContent = String(Math.floor(Math.log2(data.length)) + 1);
+      render();
+    };
+
+    const render = () => {
+      const f = frames[cur];
+      [...cellsEl.children].forEach((li, i) => {
+        const out = i < f.lo || i > f.hi;
+        li.classList.toggle('is-out', out && f.found === undefined);
+        li.classList.toggle('is-mid', f.mid === i);
+        li.classList.toggle('is-found', f.found === i);
+        const ptrs = [];
+        if (i === f.lo && f.lo < data.length) ptrs.push('lo');
+        if (i === f.mid) ptrs.push('mid');
+        if (i === f.hi && f.hi >= 0) ptrs.push('hi');
+        li.querySelector('.bs-ptr')!.textContent = ptrs.join(' ');
+      });
+      q('[data-comps]').textContent = String(f.comps);
+      q('[data-note]').textContent = f.note;
+      q('[data-count]').textContent = `${cur} / ${frames.length - 1}`;
+      root.classList.toggle('is-finished', cur === frames.length - 1);
+    };
+
+    const stop = () => {
+      window.clearInterval(timer);
+      timer = undefined;
+      playBtn.textContent = '▶ 再生';
+      playBtn.setAttribute('aria-pressed', 'false');
+    };
+    const play = () => {
+      if (cur >= frames.length - 1) cur = 0;
+      render();
+      playBtn.textContent = '❚❚ 一時停止';
+      playBtn.setAttribute('aria-pressed', 'true');
+      timer = window.setInterval(() => {
+        cur++;
+        render();
+        if (cur >= frames.length - 1) stop();
+      }, INTERVAL_MS);
+    };
+
+    root.addEventListener('click', (e) => {
+      const act = (e.target as Element).closest<HTMLButtonElement>('[data-act]')?.dataset.act;
+      if (!act) return;
+      if (act === 'play') {
+        if (timer === undefined) play();
+        else stop();
+        return;
+      }
+      stop();
+      if (act === 'next') cur = Math.min(frames.length - 1, cur + 1);
+      if (act === 'prev') cur = Math.max(0, cur - 1);
+      if (act === 'reset') cur = 0;
+      render();
+    });
+    input.addEventListener('input', () => {
+      const n = Number(input.value);
+      if (input.value.trim() === '' || !Number.isInteger(n)) return;
+      stop();
+      target = n;
+      build();
+    });
+    size.addEventListener('change', () => {
+      stop();
+      data = size.value === 'sample' ? sample.slice() : randomSorted(Number(size.value));
+      if (size.value !== 'sample') {
+        target = data[Math.floor(Math.random() * data.length)];
+        input.value = String(target);
+      }
+      buildCells();
+      build();
+    });
+
+    buildCells();
+    build();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-binary-search]').forEach(setup);
+</script>
+
+<style>
+  .bs [data-target-input] {
+    width: 6em;
+    margin-left: 4px;
+  }
+  .bs [data-size] {
+    margin-left: 4px;
+  }
+  .bs-cells {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
+    margin: 8px 0 10px;
+    padding: 0;
+  }
+  .bs-cells :global(.bs-cell) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 2.9em;
+    margin: 0;
+    transition: opacity 0.3s ease;
+  }
+  .bs-cells :global(.bs-idx) {
+    font-size: 0.7rem;
+    color: var(--fg-muted);
+  }
+  .bs-cells :global(.bs-val) {
+    width: 100%;
+    padding: 6px 0;
+    text-align: center;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    border: 2px solid var(--dg-stroke);
+    border-radius: 6px;
+    background: var(--bg);
+    box-sizing: border-box;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+  }
+  .bs-cells :global(.bs-ptr) {
+    min-height: 1.3em;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--accent);
+    white-space: nowrap;
+    letter-spacing: -0.02em;
+  }
+  .bs-cells :global(.bs-cell.is-out) {
+    opacity: 0.3;
+  }
+  .bs-cells :global(.bs-cell.is-mid .bs-val) {
+    border-color: var(--dg-c3);
+    background: color-mix(in srgb, var(--dg-c3) 40%, var(--bg));
+  }
+  .bs-cells :global(.bs-cell.is-found .bs-val) {
+    border-color: var(--dg-ok);
+    background: color-mix(in srgb, var(--dg-ok) 40%, var(--bg));
+  }
+  .bs-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    align-items: baseline;
+    font-size: 0.9rem;
+  }
+  .bs-stats strong {
+    font-size: 1.05rem;
+  }
+  .bs-linear {
+    color: var(--fg-muted);
+  }
+  .bs-linear strong {
+    color: var(--fg);
+  }
+  .bs-max {
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bs-cells :global(.bs-cell),
+    .bs-cells :global(.bs-val) {
+      transition: none;
+    }
+  }
+</style>

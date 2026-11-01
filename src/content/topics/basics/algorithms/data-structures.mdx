@@ -7,6 +7,9 @@ tags: [データ構造, アルゴリズム, 頻出]
 related: [basics/algorithms/searching, basics/algorithms/sorting]
 ---
 
+import StackQueueDemo from '../../../../components/diagrams/StackQueueDemo.astro';
+import BinaryTree from '../../../../components/diagrams/BinaryTree.astro';
+
 **データ構造** とは、データを効率よく格納・操作するための形式です。データの追加・削除・参照のどれを速くしたいかによって、適したデータ構造が変わります。
 
 ## 仕組み
@@ -15,8 +18,8 @@ related: [basics/algorithms/searching, basics/algorithms/sorting]
 
 同じ型のデータを **連続した領域** に並べ、添字（インデックス）で要素を指定します。
 
-- 添字による参照は O(1) で高速
-- 途中への挿入・削除は、後ろの要素をずらす必要があり O(n)
+- 添字による参照は $O(1)$ で高速
+- 途中への挿入・削除は、後ろの要素をずらす必要があり $O(n)$
 - 2次元配列は行・列の 2 つの添字で要素を指定します
 
 ### 連結リスト（リスト）
@@ -29,8 +32,8 @@ related: [basics/algorithms/searching, basics/algorithms/sorting]
 | 双方向リスト | 次と前の要素へのポインタを持ち、逆方向にもたどれる |
 | 環状リスト | 末尾の要素が先頭を指す |
 
-- 挿入・削除はポインタを付け替えるだけでよい（位置が分かっていれば O(1)）
-- 特定の位置の要素を参照するには先頭からたどる必要があり O(n)
+- 挿入・削除はポインタを付け替えるだけでよい（位置が分かっていれば $O(1)$）
+- 特定の位置の要素を参照するには先頭からたどる必要があり $O(n)$
 
 ### スタックとキュー
 
@@ -38,6 +41,14 @@ related: [basics/algorithms/searching, basics/algorithms/sorting]
 | --- | --- | --- | --- |
 | スタック | **後入れ先出し（LIFO）** | push（積む）/ pop（取り出す） | 関数呼出しの戻り先管理、式の評価（逆ポーランド記法）、深さ優先探索 |
 | キュー | **先入れ先出し（FIFO）** | enqueue（追加）/ dequeue（取り出す） | 処理待ち行列、印刷待ち、幅優先探索 |
+
+同じ操作をスタックとキューに行い、取り出される順番の違いを見てみましょう（操作の列は例題1・例題2と同じです）。
+
+<StackQueueDemo
+  title="スタックとキュー"
+  ops={['push 1', 'push 2', 'pop', 'push 3', 'push 4', 'pop', 'pop']}
+  caption="オレンジの枠は、次に取り出される要素です。上のボタンで自由に出し入れすることもできます。"
+/>
 
 ### 木構造
 
@@ -51,7 +62,7 @@ related: [basics/algorithms/searching, basics/algorithms/sorting]
 | ヒープ | 完全二分木で、どの節点でも「親 ≥ 子」（最大ヒープ）または「親 ≤ 子」（最小ヒープ）が成り立つ |
 | B木 | 1 つの節点に複数のキーを持つ多分木。データベースの索引などに使われる |
 
-二分探索木は、木の形が偏らず平衡していれば探索が O(log n) ですが、昇順に値を挿入するなどして偏ると、リストと同じ O(n) になります。
+二分探索木は、木の形が偏らず平衡していれば探索が $O(\log n)$ ですが、昇順に値を挿入するなどして偏ると、リストと同じ $O(n)$ になります。
 
 ### 二分木の走査（なぞり方）
 
@@ -62,6 +73,14 @@ related: [basics/algorithms/searching, basics/algorithms/sorting]
 | 後行順（帰りがけ順） | 左部分木 → 右部分木 → 節点 |
 
 二分探索木を中間順でなぞると、値が **昇順** に取り出せます。
+
+例題3 の二分探索木を中間順でなぞると、次のようになります。
+
+<BinaryTree
+  title="二分探索木を中間順でなぞる"
+  tree={{ v: 8, l: { v: 3, l: { v: 1 }, r: { v: 6 } }, r: { v: 10 } }}
+  traversal="in"
+/>
 
 ## 例題
 
