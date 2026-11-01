@@ -62,6 +62,15 @@ import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.ast
 | `SubnetCalculator` | IPv4 アドレスとプレフィックス長から、ネットワーク部とホスト部の色分け、各アドレス、ホスト数を即時計算（props: ip, prefix） |
 | `SwitchLearning` | L2スイッチの MACアドレス学習・フラッディング・転送のステップ再生 |
 | `TransferTimeCalculator` | データ量・回線速度・伝送効率から伝送時間を式つきで計算（props: size, sizeUnit, speed, speedUnit, efficiency） |
+| `BitToggle` | 8ビットをクリックで切替え、各桁の重みと 10進・16進・2進を即時表示（10進入力も可）。`signed` で 2の補数（MSB の重み −128）（props: initial, signed） |
+| `FloatBitLayout` | IEEE 754 単精度のビット配置を符号部・指数部・仮数部で色分けし、ビット操作・10進入力で各部の意味と値を表示。単精度/倍精度のビット数比較つき（props: bits, formats） |
+| `LogicGateSimulator` | AND/OR/NOT/XOR/NAND/NOR を選び、入力をクリックで切替え、出力ランプと真理値表の該当行を強調（props: gates, initial） |
+| `HalfAdderCircuit` | 半加算器の回路図（XOR が和 S、AND が桁上がり C）を入力の切替えで動かす |
+| `StackQueueDemo` | スタック（LIFO）とキュー（FIFO）を並べ、出し入れをアニメーション表示。同じ操作列を両方に1手ずつ実行できる（props: ops, capacity） |
+| `BinaryTree` | 二分木の図。`traversal`（pre/in/post）を指定すると、なぞる順にステップ再生（props: tree, traversal） |
+| `SortVisualizer` | バブル・選択・挿入ソートを棒グラフでステップ再生。比較中/交換/確定済みの色分け、比較・交換回数、シャッフル（props: values, algorithm, shuffleSize） |
+| `BinarySearchDemo` | 二分探索の lo/mid/hi をステップ再生し、比較回数と線形探索の回数を並べて表示。探す値・配列の大きさを変更可（props: values, target, sizes） |
+| `CallStackDiagram` | 関数の呼出しスタックが積まれて戻る様子（戻り値の矢印つき）をステップ再生。再帰のトレースに（props: steps） |
 
 部品を追加したらこの表に追記してください。
 
