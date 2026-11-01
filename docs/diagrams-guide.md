@@ -82,6 +82,7 @@ import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.ast
 | `FirewallDmz` | ファイアウォールと DMZ の構成図で、パケットの許可・拒否と一致したルール表の行をステップ再生 |
 | `ArrowDiagram` | アローダイアグラムの最早・最遅結合点時刻を計算しながらステップ再生し、クリティカルパスを強調（props: nodes, activities, width, height, unit, note） |
 | `NormalizationSteps` | 正規化で表が分割されていく様子（非正規形 → 第3正規形）をステップ再生。列を分割先の表ごとに色分け（props: stages, groups） |
+| `AuditProcessFlow` | システム監査の流れ（監査計画 → 予備調査 → 本調査 → 評価・結論 → 監査報告 → フォローアップ）を各段階の成果物つきでステップ再生。改善の実施は監査対象部門であることを色分けで示す |
 
 部品を追加したらこの表に追記してください。
 
