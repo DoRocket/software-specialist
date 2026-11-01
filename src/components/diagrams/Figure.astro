@@ -10,11 +10,13 @@ interface Props {
   steps?: number;
   /** 説明文の初期表示（ステップ 0 のとき） */
   intro?: string;
+  /** 自動再生の間隔（ミリ秒）。説明文が長い図は長めにする。既定 2500 */
+  interval?: number;
 }
-const { title, caption, steps = 0, intro } = Astro.props;
+const { title, caption, steps = 0, intro, interval } = Astro.props;
 ---
 
-<figure class="diagram" data-stepper={steps > 0 ? '' : undefined} data-steps={steps > 0 ? steps : undefined}>
+<figure class="diagram" data-stepper={steps > 0 ? '' : undefined} data-steps={steps > 0 ? steps : undefined} data-interval={interval}>
   {title && <figcaption class="diagram-title">{title}</figcaption>}
   <div class="diagram-body">
     <slot />

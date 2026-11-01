@@ -123,7 +123,7 @@ const cpStepNo = order.length + 2;
 const steps = cpStepNo;
 ---
 
-<Figure title={title} caption={caption} steps={steps} intro="矢印が作業（括弧内は所要日数）、丸が結合点です。開始点から順に、各結合点の最早結合点時刻を求めていきます。">
+<Figure title={title} caption={caption} interval={3500} steps={steps} intro="矢印が作業（括弧内は所要日数）、丸が結合点です。開始点から順に、各結合点の最早結合点時刻を求めていきます。">
   <svg class="ad" viewBox={`0 0 ${width} ${height}`} style={`max-width: ${Math.round(width * 1.35)}px; margin: 0 auto;`} role="img" aria-label={title}>
     <defs>
       <marker id="ad-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">

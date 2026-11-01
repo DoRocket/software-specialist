@@ -38,9 +38,11 @@ import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.ast
 | --- | --- |
 | `data-step="n"` | ステップ n 以降で表示（フェードイン）。現在のステップの要素には `.is-current` が付く |
 | `data-step-only="n"` | ステップ n のときだけ表示（説明文向け） |
+| `data-step-until="m"` | ステップ m までだけ表示（`data-step="n"` と組み合わせると n〜m のあいだだけ表示） |
 | `class="dg-draw"`（線・パス） | `data-step` を付けた要素（またはその子）で、線を描くように表示 |
 
 説明文は `slot="narration"` に `data-step-only` 付きの `<p>` を並べます。
+自動再生の間隔は既定 2.5 秒です。説明文が長い図は `Figure` の `interval`（ミリ秒）で長くします。
 
 ```astro
 <Figure title="…" steps={3} intro="ステップ 0 で表示する説明">
@@ -71,6 +73,15 @@ import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.ast
 | `SortVisualizer` | バブル・選択・挿入ソートを棒グラフでステップ再生。比較中/交換/確定済みの色分け、比較・交換回数、シャッフル（props: values, algorithm, shuffleSize） |
 | `BinarySearchDemo` | 二分探索の lo/mid/hi をステップ再生し、比較回数と線形探索の回数を並べて表示。探す値・配列の大きさを変更可（props: values, target, sizes） |
 | `CallStackDiagram` | 関数の呼出しスタックが積まれて戻る様子（戻り値の矢印つき）をステップ再生。再帰のトレースに（props: steps） |
+| `MemoryHierarchy` | 記憶階層のピラミッド図（上ほど高速・小容量・高価）。静的な図 |
+| `EffectiveAccessTime` | キャッシュ・主記憶のアクセス時間とヒット率から実効アクセス時間を式つきで計算し、グラフに現在の点を表示。例題ボタン付き（props: cache, main, hit, presets） |
+| `ReliabilityCalculator` | 装置 A・B・C の稼働率をスライダーで変え、直列・並列・並列＋直列の構成図と全体稼働率を式つきで表示（props: a, b, c） |
+| `TaskStateDiagram` | タスクの状態遷移（実行可能・実行・待ち）をディスパッチ／プリエンプション／入出力要求／入出力完了の順にステップ再生 |
+| `CryptoFlow` | 鍵・封をした文書の絵で暗号化して送る流れをステップ再生。公開鍵と共通鍵（鍵配送問題）を切り替え（props: mode="public" \| "symmetric"） |
+| `DigitalSignatureFlow` | デジタル署名の生成（ハッシュ → 送信者の秘密鍵で署名）と検証、改ざん時の不一致をステップ再生 |
+| `FirewallDmz` | ファイアウォールと DMZ の構成図で、パケットの許可・拒否と一致したルール表の行をステップ再生 |
+| `ArrowDiagram` | アローダイアグラムの最早・最遅結合点時刻を計算しながらステップ再生し、クリティカルパスを強調（props: nodes, activities, width, height, unit, note） |
+| `NormalizationSteps` | 正規化で表が分割されていく様子（非正規形 → 第3正規形）をステップ再生。列を分割先の表ごとに色分け（props: stages, groups） |
 
 部品を追加したらこの表に追記してください。
 
@@ -82,4 +93,4 @@ import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.ast
 - 1つの図で伝えることは1つ。説明文（narration）で「今なにが起きたか」を1〜2文で言う
 - 操作できる部品（計算機など）は `<script>` で実装し、同じページに複数置いても動くよう
   `document.querySelectorAll('[data-xxx]')` で各インスタンスを初期化する
-- 部品内の固有のスタイルは `<style>`（Astro のスコープ付き CSS）に書く。共通の見た目は `.diagram`, `.dg-controls`, `.dg-result`, `.dg-btn`, `.dg-mono` を使う
+- 部品内の固有のスタイルは `<style>`（Astro のスコープ付き CSS）に書く。`Figure` が出力する要素（`.diagram-body` など）を起点にするセレクタは、スコープが合わず効かないので `:global(.diagram-body) svg .x` のように書く。共通の見た目は `.diagram`, `.dg-controls`, `.dg-result`, `.dg-btn`, `.dg-mono` を使う

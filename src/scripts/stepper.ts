@@ -4,6 +4,7 @@
  * マークアップの約束:
  *   <figure data-stepper data-steps="4">
  *     <g data-step="2">…</g>        … ステップ 2 以降で表示（それまでは非表示）
+ *     <g data-step="2" data-step-until="4">… ステップ 2〜4 のあいだだけ表示（data-step 省略時は 0 から）
  *     <p data-step-only="2">…</p>   … ステップ 2 のときだけ表示（説明文など）
  *     <button data-stepper-act="prev|next|play|reset">
  *     <span data-stepper-count>     … 「2 / 4」の表示先
@@ -11,22 +12,25 @@
  *
  * 現在のステップの要素には .is-current が付くので、CSS で「今動いたもの」を強調できる。
  * 画面に入ったら自動再生する（prefers-reduced-motion が有効なら自動再生しない）。
+ * 自動再生の間隔は data-interval（ミリ秒）で図ごとに変えられる。
  */
-const INTERVAL_MS = 1800;
+const DEFAULT_INTERVAL_MS = 2500;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function setup(root: HTMLElement) {
   const total = Number(root.dataset.steps ?? 0);
   if (!total) return;
+  const interval = Number(root.dataset.interval) || DEFAULT_INTERVAL_MS;
   let current = 0;
   let timer: number | undefined;
   const playBtn = root.querySelector<HTMLButtonElement>('[data-stepper-act="play"]');
 
   const render = () => {
-    for (const el of root.querySelectorAll<HTMLElement | SVGElement>('[data-step]')) {
-      const n = Number(el.dataset.step);
-      el.classList.toggle('is-visible', n <= current);
-      el.classList.toggle('is-current', n === current);
+    for (const el of root.querySelectorAll<HTMLElement | SVGElement>('[data-step], [data-step-until]')) {
+      const from = Number(el.dataset.step ?? 0);
+      const until = el.dataset.stepUntil === undefined ? Infinity : Number(el.dataset.stepUntil);
+      el.classList.toggle('is-visible', from <= current && current <= until);
+      el.classList.toggle('is-current', from === current);
     }
     for (const el of root.querySelectorAll<HTMLElement | SVGElement>('[data-step-only]')) {
       el.classList.toggle('is-visible', Number(el.dataset.stepOnly) === current);
@@ -57,7 +61,7 @@ function setup(root: HTMLElement) {
       current++;
       render();
       if (current >= total) stop();
-    }, INTERVAL_MS);
+    }, interval);
   };
 
   root.addEventListener('click', (e) => {

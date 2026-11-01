@@ -43,7 +43,7 @@ interface Props {
 const { title = '正規化の手順', caption, stages, groups = [] } = Astro.props;
 ---
 
-<Figure title={title} caption={caption} steps={stages.length - 1}>
+<Figure title={title} caption={caption} interval={3500} steps={stages.length - 1}>
   <div class="nm">
     {
       groups.length > 0 && (
@@ -145,9 +145,12 @@ const { title = '正規化の手順', caption, stages, groups = [] } = Astro.pro
   /* すべての段階を同じセルに重ね、高さを最も高い段階にそろえる（切り替えで本文が上下に動かないように） */
   .nm-stages {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
   }
   .nm-stage {
     grid-area: 1 / 1;
+    /* 幅の広い表で図全体が広がらないよう、中の .nm-scroll で横スクロールさせる */
+    min-width: 0;
   }
   .nm-stage[data-step-only]:not(.is-visible) {
     display: block;
@@ -175,6 +178,7 @@ const { title = '正規化の手順', caption, stages, groups = [] } = Astro.pro
   }
   .nm-table-wrap {
     max-width: 100%;
+    min-width: 0;
   }
   .nm-table-name {
     font-weight: 700;

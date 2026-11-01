@@ -88,7 +88,7 @@ const steps = packets.length;
 const pts = (p: Pt[]) => p.map(([x, y]) => `${x},${y}`).join(' ');
 ---
 
-<Figure title={title} caption={caption} steps={steps} intro="インターネット・DMZ・内部 LAN の境界にファイアウォールを置き、ルール表に従って通信を許可・拒否します。">
+<Figure title={title} caption={caption} interval={3500} steps={steps} intro="インターネット・DMZ・内部 LAN の境界にファイアウォールを置き、ルール表に従って通信を許可・拒否します。">
   <svg class="fw" viewBox="0 0 480 300" style="max-width: 640px; margin: 0 auto;" role="img" aria-label="インターネット、ファイアウォール、DMZ、内部 LAN の構成図">
     <!-- 区域 -->
     <rect class="fw-zone fw-zone-lan" x="316" y="14" width="160" height="146" rx="12" />

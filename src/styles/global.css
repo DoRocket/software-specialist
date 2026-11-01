@@ -732,6 +732,7 @@ a {
 
 /* ステップ再生: data-step は該当ステップ以降、data-step-only はそのステップだけ表示 */
 [data-stepper] [data-step],
+[data-stepper] [data-step-until],
 [data-stepper] [data-step-only] {
   opacity: 0;
   transition: opacity 0.45s ease, transform 0.45s ease;
