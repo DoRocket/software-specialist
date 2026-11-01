@@ -1,4 +1,5 @@
 ---
+icon: management
 title: マネジメント
 order: 7
 summary: プロジェクトマネジメント、ITサービスマネジメント、システム監査など、ITを管理・統制する手法

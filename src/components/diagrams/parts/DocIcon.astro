@@ -1,0 +1,89 @@
+---
+/**
+ * SVG の中に置く「文書」の絵。(x, y) は文書の中心。幅 46・高さ 58。
+ * sealed: 暗号化された文書（中身が読めない模様＋南京錠）。lockColor で南京錠の色を指定。
+ * label を付けると文書の下に表示する。
+ */
+interface Props {
+  x: number;
+  y: number;
+  sealed?: boolean;
+  lockColor?: string;
+  label?: string;
+  class?: string;
+}
+const { x, y, sealed = false, lockColor = 'var(--fg-muted)', label, class: cls } = Astro.props;
+---
+
+<g class:list={['dg-doc', { 'is-sealed': sealed }, cls]} transform={`translate(${x - 23} ${y - 29})`} style={`--lock: ${lockColor};`}>
+  <path d="M0,0 H34 L46,12 V58 H0 Z" class="dg-doc-paper" />
+  <path d="M34,0 V12 H46" class="dg-doc-fold" />
+  {
+    sealed ? (
+      <g class="dg-doc-scramble">
+        <path d="M7,18 h6 m4,0 h4 m4,0 h8 M7,27 h10 m4,0 h3 m4,0 h7 M7,36 h4 m4,0 h9 m3,0 h6 M7,45 h12 m4,0 h6" />
+      </g>
+    ) : (
+      <g class="dg-doc-lines">
+        <path d="M7,18 H30 M7,27 H39 M7,36 H39 M7,45 H26" />
+      </g>
+    )
+  }
+  {
+    sealed && (
+      <g class="dg-doc-lock" transform="translate(28 34)">
+        <path d="M5,9 V5 a7,7 0 0 1 14,0 V9" class="dg-doc-shackle" />
+        <rect x="1" y="9" width="22" height="17" rx="3" class="dg-doc-body" />
+        <circle cx="12" cy="16.5" r="2.6" class="dg-doc-keyhole" />
+      </g>
+    )
+  }
+  {
+    label && (
+      <text x="23" y="78" text-anchor="middle" class="dg-doc-label">
+        {label}
+      </text>
+    )
+  }
+</g>
+
+<style>
+  .dg-doc-paper {
+    fill: var(--bg);
+    stroke: var(--fg-muted);
+    stroke-width: 1.5;
+  }
+  .dg-doc-fold {
+    fill: none;
+    stroke: var(--fg-muted);
+    stroke-width: 1.5;
+  }
+  .dg-doc-lines path {
+    stroke: var(--fg);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+  }
+  .dg-doc-scramble path {
+    stroke: var(--fg-muted);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    opacity: 0.6;
+  }
+  .dg-doc-shackle {
+    fill: none;
+    stroke: color-mix(in srgb, var(--lock) 60%, var(--fg));
+    stroke-width: 3;
+  }
+  .dg-doc-body {
+    fill: var(--lock);
+    stroke: color-mix(in srgb, var(--lock) 60%, var(--fg));
+    stroke-width: 1.2;
+  }
+  .dg-doc-keyhole {
+    fill: var(--bg);
+  }
+  :global(.diagram-body) svg .dg-doc-label {
+    font-size: 14px;
+    font-weight: 700;
+  }
+</style>

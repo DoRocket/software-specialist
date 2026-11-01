@@ -1,0 +1,282 @@
+---
+/**
+ * 実効アクセス時間の計算機。
+ * キャッシュ・主記憶のアクセス時間とヒット率を変えると、
+ *   実効アクセス時間 = キャッシュのアクセス時間 × ヒット率 + 主記憶のアクセス時間 × (1 − ヒット率)
+ * を式つきで表示し、ヒット率と実効アクセス時間の関係（直線）のグラフ上に現在の点を示す。
+ *
+ * 使い方（.mdx）:
+ *   <EffectiveAccessTime cache={10} main={60} hit={90} />
+ * - cache / main はナノ秒、hit は % （初期値）
+ * - presets で「例題」ボタンを付けられる: presets={[{ label: '例題1', cache: 10, main: 60, hit: 90 }]}
+ */
+import Figure from './Figure.astro';
+
+interface Preset {
+  label: string;
+  cache: number;
+  main: number;
+  hit: number;
+}
+interface Props {
+  title?: string;
+  caption?: string;
+  cache?: number;
+  main?: number;
+  hit?: number;
+  presets?: Preset[];
+}
+const { title = '実効アクセス時間の計算機', caption, cache = 10, main = 60, hit = 90, presets = [] } = Astro.props;
+
+// グラフの描画領域（viewBox 座標）
+const plot = { x1: 52, x2: 384, y1: 26, y2: 182 };
+---
+
+<Figure title={title} caption={caption}>
+  <div class="eat" data-eat data-plot={JSON.stringify(plot)}>
+    <div class="dg-controls eat-inputs">
+      <label>キャッシュ <input type="number" data-eat-cache value={cache} min="0" step="any" inputmode="decimal" /> ナノ秒</label>
+      <label>主記憶 <input type="number" data-eat-main value={main} min="0" step="any" inputmode="decimal" /> ナノ秒</label>
+      <label class="eat-hit">
+        ヒット率
+        <input type="range" data-eat-hit-range value={hit} min="0" max="100" step="1" />
+        <input type="number" data-eat-hit value={hit} min="0" max="100" step="any" inputmode="decimal" class="eat-hit-num" />%
+      </label>
+      {
+        presets.length > 0 && (
+          <span class="eat-presets">
+            {presets.map((p) => (
+              <button type="button" class="dg-btn" data-eat-preset={JSON.stringify(p)}>
+                {p.label}
+              </button>
+            ))}
+          </span>
+        )
+      }
+    </div>
+
+    <div class="dg-result eat-result" aria-live="polite">
+      <div class="eat-formula-label">実効アクセス時間 = キャッシュ × ヒット率 + 主記憶 × (1 − ヒット率)</div>
+      <div class="dg-mono eat-formula" data-eat-formula></div>
+      <div class="eat-answer">実効アクセス時間 <strong data-eat-answer></strong></div>
+    </div>
+
+    <svg class="eat-chart" viewBox="0 0 400 236" style="max-width: 560px; margin: 12px auto 0;" role="img" aria-label="ヒット率と実効アクセス時間の関係のグラフ" data-eat-chart>
+      <!-- 目盛り線と軸 -->
+      <line class="eat-grid" data-eat-grid-main x1={plot.x1} x2={plot.x2} />
+      <line class="eat-grid" data-eat-grid-cache x1={plot.x1} x2={plot.x2} />
+      <line class="eat-axis" x1={plot.x1} y1={plot.y2} x2={plot.x2} y2={plot.y2} />
+      <line class="eat-axis" x1={plot.x1} y1={plot.y1} x2={plot.x1} y2={plot.y2} />
+      <text class="eat-tick" data-eat-label-main x={plot.x1 - 8} text-anchor="end"></text>
+      <text class="eat-tick" data-eat-label-cache x={plot.x1 - 8} text-anchor="end"></text>
+      <text class="eat-tick" x={plot.x1 - 8} y={plot.y2 + 5} text-anchor="end">0</text>
+      {
+        [0, 50, 100].map((v) => (
+          <text class="eat-tick" x={plot.x1 + ((plot.x2 - plot.x1) * v) / 100} y={plot.y2 + 20} text-anchor="middle">
+            {v}%
+          </text>
+        ))
+      }
+      <text class="eat-axis-title" x={(plot.x1 + plot.x2) / 2} y={plot.y2 + 42} text-anchor="middle">ヒット率</text>
+      <text class="eat-axis-title" x={plot.x1 + 6} y={plot.y1 - 6}>ナノ秒</text>
+
+      <!-- 実効アクセス時間の直線と現在の点 -->
+      <line class="eat-line" data-eat-line />
+      <line class="eat-guide" data-eat-guide-x />
+      <line class="eat-guide" data-eat-guide-y />
+      <circle class="eat-dot-ring" r="9" data-eat-dot-ring />
+      <circle class="eat-dot" r="6" data-eat-dot />
+      <text class="eat-dot-label" data-eat-dot-label></text>
+      <rect class="eat-hit-area" x={plot.x1} y={plot.y1} width={plot.x2 - plot.x1} height={plot.y2 - plot.y1} data-eat-hit-area />
+    </svg>
+  </div>
+</Figure>
+
+<script>
+  type Plot = { x1: number; x2: number; y1: number; y2: number };
+
+  /** 計算結果を見やすい桁数に（浮動小数点の誤差を消す） */
+  const fmt = (n: number) => String(parseFloat(n.toFixed(4)));
+
+  function init(root: HTMLElement) {
+    const plot: Plot = JSON.parse(root.dataset.plot ?? '{}');
+    const $ = <T extends Element>(sel: string) => root.querySelector<T>(sel)!;
+    const cacheIn = $<HTMLInputElement>('[data-eat-cache]');
+    const mainIn = $<HTMLInputElement>('[data-eat-main]');
+    const hitRange = $<HTMLInputElement>('[data-eat-hit-range]');
+    const hitIn = $<HTMLInputElement>('[data-eat-hit]');
+    const formula = $<HTMLElement>('[data-eat-formula]');
+    const answer = $<HTMLElement>('[data-eat-answer]');
+    const set = (sel: string, attrs: Record<string, number | string>) => {
+      const el = $<SVGElement>(sel);
+      for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+      return el;
+    };
+
+    const update = () => {
+      const c = Math.max(0, Number(cacheIn.value) || 0);
+      const m = Math.max(0, Number(mainIn.value) || 0);
+      const pct = Math.min(100, Math.max(0, Number(hitIn.value) || 0));
+      const h = pct / 100;
+      const hitPart = c * h;
+      const missPart = m * (1 - h);
+      const eat = hitPart + missPart;
+      const hs = fmt(h);
+      formula.textContent = `${fmt(c)} × ${hs} + ${fmt(m)} × (1 − ${hs}) = ${fmt(hitPart)} + ${fmt(missPart)} = ${fmt(eat)}`;
+      answer.textContent = `${fmt(eat)} ナノ秒`;
+
+      // グラフ: 縦軸は 0〜(遅いほうの時間 × 1.1)
+      const yMax = Math.max(c, m, 1e-9) * 1.1;
+      const X = (p: number) => plot.x1 + ((plot.x2 - plot.x1) * p) / 100;
+      const Y = (t: number) => plot.y2 - ((plot.y2 - plot.y1) * t) / yMax;
+      set('[data-eat-line]', { x1: X(0), y1: Y(m), x2: X(100), y2: Y(c) });
+      set('[data-eat-grid-main]', { y1: Y(m), y2: Y(m) });
+      set('[data-eat-grid-cache]', { y1: Y(c), y2: Y(c) });
+      const near = Math.abs(Y(m) - Y(c)) < 16;
+      set('[data-eat-label-main]', { y: Y(m) + 5 - (near && m >= c ? 8 : 0) + (near && m < c ? 8 : 0) }).textContent = fmt(m);
+      set('[data-eat-label-cache]', { y: Y(c) + 5 + (near && m >= c ? 8 : 0) - (near && m < c ? 8 : 0) }).textContent = fmt(c);
+      const px = X(pct);
+      const py = Y(eat);
+      set('[data-eat-guide-x]', { x1: px, y1: py, x2: px, y2: plot.y2 });
+      set('[data-eat-guide-y]', { x1: plot.x1, y1: py, x2: px, y2: py });
+      set('[data-eat-dot]', { cx: px, cy: py });
+      set('[data-eat-dot-ring]', { cx: px, cy: py });
+      const label = set('[data-eat-dot-label]', {
+        x: pct > 60 ? px - 14 : px + 14,
+        y: py - 18 < plot.y1 + 4 ? py + 28 : py - 18,
+        'text-anchor': pct > 60 ? 'end' : 'start',
+      });
+      label.textContent = `${fmt(pct)}% → ${fmt(eat)} ns`;
+    };
+
+    const setHit = (v: number) => {
+      hitIn.value = fmt(v);
+      hitRange.value = String(v);
+      update();
+    };
+    hitRange.addEventListener('input', () => setHit(Number(hitRange.value)));
+    hitIn.addEventListener('input', () => {
+      hitRange.value = hitIn.value;
+      update();
+    });
+    cacheIn.addEventListener('input', update);
+    mainIn.addEventListener('input', update);
+
+    for (const btn of root.querySelectorAll<HTMLButtonElement>('[data-eat-preset]')) {
+      btn.addEventListener('click', () => {
+        const p = JSON.parse(btn.dataset.eatPreset ?? '{}');
+        cacheIn.value = String(p.cache);
+        mainIn.value = String(p.main);
+        setHit(p.hit);
+      });
+    }
+
+    // グラフをクリック・ドラッグしてもヒット率を変えられる
+    const svg = $<SVGSVGElement>('[data-eat-chart]');
+    const area = $<SVGRectElement>('[data-eat-hit-area]');
+    const fromPointer = (e: PointerEvent) => {
+      const pt = svg.createSVGPoint();
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+      const p = pt.matrixTransform(svg.getScreenCTM()!.inverse());
+      const pct = Math.round(((p.x - plot.x1) / (plot.x2 - plot.x1)) * 100);
+      setHit(Math.min(100, Math.max(0, pct)));
+    };
+    area.addEventListener('pointerdown', (e) => {
+      area.setPointerCapture(e.pointerId);
+      fromPointer(e);
+    });
+    area.addEventListener('pointermove', (e) => {
+      if (area.hasPointerCapture(e.pointerId)) fromPointer(e);
+    });
+
+    update();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-eat]').forEach(init);
+</script>
+
+<style>
+  .eat-inputs input[type='number'] {
+    width: 5.5em;
+  }
+  .eat-inputs .eat-hit-num {
+    width: 4.5em;
+  }
+  .eat-hit {
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .eat-hit input[type='range'] {
+    width: clamp(110px, 30vw, 160px);
+    accent-color: var(--accent);
+  }
+  .eat-presets {
+    display: inline-flex;
+    gap: 6px;
+  }
+  .eat-formula-label {
+    font-size: 0.82rem;
+    color: var(--fg-muted);
+  }
+  .eat-formula {
+    margin: 4px 0;
+    font-size: 0.95rem;
+    overflow-wrap: anywhere;
+  }
+  .eat-answer strong {
+    font-size: 1.15rem;
+    color: var(--accent);
+  }
+  .eat-axis {
+    stroke: var(--fg-muted);
+    stroke-width: 1.5;
+  }
+  .eat-grid {
+    stroke: var(--border);
+    stroke-width: 1;
+    stroke-dasharray: 3 4;
+  }
+  :global(.diagram-body) svg .eat-tick {
+    font-size: 15px;
+    fill: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  :global(.diagram-body) svg .eat-axis-title {
+    font-size: 15px;
+    fill: var(--fg-muted);
+  }
+  .eat-line {
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  .eat-guide {
+    stroke: var(--accent);
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+    opacity: 0.7;
+  }
+  .eat-dot {
+    fill: var(--accent);
+  }
+  .eat-dot-ring {
+    fill: var(--bg-subtle);
+  }
+  :global(.diagram-body) svg .eat-dot-label {
+    paint-order: stroke;
+    stroke: var(--bg-subtle);
+    stroke-width: 5px;
+    stroke-linejoin: round;
+    font-size: 16px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .eat-hit-area {
+    fill: transparent;
+    cursor: crosshair;
+    touch-action: pan-y;
+  }
+</style>

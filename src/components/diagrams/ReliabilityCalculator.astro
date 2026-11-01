@@ -1,0 +1,283 @@
+---
+/**
+ * 稼働率の計算機。装置 A・B・C の稼働率をスライダーで変えると、
+ * 直列・並列・並列＋直列 の構成図と全体の稼働率を式つきで表示する。
+ *
+ * 使い方（.mdx）:
+ *   <ReliabilityCalculator a={0.9} b={0.9} c={0.95} />
+ * - a / b / c は初期値（0.5〜1）。c は「並列＋直列」の構成でだけ使う。
+ */
+import Figure from './Figure.astro';
+
+interface Props {
+  title?: string;
+  caption?: string;
+  a?: number;
+  b?: number;
+  c?: number;
+}
+const { title = '稼働率の計算機', caption, a = 0.9, b = 0.9, c = 0.95 } = Astro.props;
+
+const devices = [
+  { key: 'a', label: '装置 A', value: a },
+  { key: 'b', label: '装置 B', value: b },
+  { key: 'c', label: '装置 C', value: c },
+];
+const W = 92;
+const H = 40;
+---
+
+<Figure title={title} caption={caption}>
+  <div class="rc" data-rc>
+    <div class="dg-controls rc-sliders">
+      {
+        devices.map((d) => (
+          <label class="rc-slider">
+            <span class="rc-name">{d.label}</span>
+            <input type="range" min="0.5" max="1" step="0.01" value={d.value} data-rc-in={d.key} />
+            <output class="dg-mono" data-rc-out={d.key}>
+              {d.value.toFixed(2)}
+            </output>
+          </label>
+        ))
+      }
+      <span class="rc-note">（装置 C は「並列＋直列」でだけ使います）</span>
+    </div>
+
+    <div class="rc-panels">
+      <section class="rc-panel">
+        <h4 class="rc-title">直列: 両方とも稼働していれば稼働</h4>
+        <svg viewBox="0 0 360 100" role="img" aria-label="装置 A と装置 B の直列構成">
+          <line class="rc-wire" x1="8" y1="50" x2="352" y2="50" />
+          <g transform={`translate(${90 - W / 2} ${50 - H / 2})`}>
+            <rect class="rc-dev" width={W} height={H} rx="8" />
+            <text x={W / 2} y="17" text-anchor="middle" class="rc-dev-name">A</text>
+            <text x={W / 2} y="34" text-anchor="middle" class="rc-dev-val" data-rc-val="a" />
+          </g>
+          <g transform={`translate(${270 - W / 2} ${50 - H / 2})`}>
+            <rect class="rc-dev" width={W} height={H} rx="8" />
+            <text x={W / 2} y="17" text-anchor="middle" class="rc-dev-name">B</text>
+            <text x={W / 2} y="34" text-anchor="middle" class="rc-dev-val" data-rc-val="b" />
+          </g>
+          <circle class="rc-end" cx="8" cy="50" r="5" />
+          <circle class="rc-end" cx="352" cy="50" r="5" />
+        </svg>
+        <div class="dg-result">
+          <div class="rc-formula-label">A × B</div>
+          <div class="dg-mono rc-formula" data-rc-formula="series"></div>
+          <div class="rc-bar"><span data-rc-bar="series"></span></div>
+        </div>
+      </section>
+
+      <section class="rc-panel">
+        <h4 class="rc-title">並列: どちらか一方でも稼働していれば稼働</h4>
+        <svg viewBox="0 0 360 130" role="img" aria-label="装置 A と装置 B の並列構成">
+          <polyline class="rc-wire" points="8,65 80,65 80,32 280,32 280,65 352,65" />
+          <polyline class="rc-wire" points="80,65 80,98 280,98 280,65" />
+          <g transform={`translate(${180 - W / 2} ${32 - H / 2})`}>
+            <rect class="rc-dev" width={W} height={H} rx="8" />
+            <text x={W / 2} y="17" text-anchor="middle" class="rc-dev-name">A</text>
+            <text x={W / 2} y="34" text-anchor="middle" class="rc-dev-val" data-rc-val="a" />
+          </g>
+          <g transform={`translate(${180 - W / 2} ${98 - H / 2})`}>
+            <rect class="rc-dev" width={W} height={H} rx="8" />
+            <text x={W / 2} y="17" text-anchor="middle" class="rc-dev-name">B</text>
+            <text x={W / 2} y="34" text-anchor="middle" class="rc-dev-val" data-rc-val="b" />
+          </g>
+          <circle class="rc-end" cx="8" cy="65" r="5" />
+          <circle class="rc-end" cx="352" cy="65" r="5" />
+        </svg>
+        <div class="dg-result">
+          <div class="rc-formula-label">1 − (1 − A)(1 − B)　… 両方とも停止している確率を 1 から引く</div>
+          <div class="dg-mono rc-formula" data-rc-formula="parallel"></div>
+          <div class="rc-bar"><span data-rc-bar="parallel"></span></div>
+        </div>
+      </section>
+
+      <section class="rc-panel">
+        <h4 class="rc-title">並列＋直列: A と B の並列部分に C を直列に接続</h4>
+        <svg viewBox="0 0 360 130" role="img" aria-label="装置 A と B の並列部分に装置 C を直列に接続した構成">
+          <polyline class="rc-wire" points="8,65 30,65 30,32 186,32 186,65 352,65" />
+          <polyline class="rc-wire" points="30,65 30,98 186,98 186,65" />
+          <rect class="rc-group" x="18" y="4" width="180" height="122" rx="10" />
+          <g transform={`translate(${108 - W / 2} ${32 - H / 2})`}>
+            <rect class="rc-dev" width={W} height={H} rx="8" />
+            <text x={W / 2} y="17" text-anchor="middle" class="rc-dev-name">A</text>
+            <text x={W / 2} y="34" text-anchor="middle" class="rc-dev-val" data-rc-val="a" />
+          </g>
+          <g transform={`translate(${108 - W / 2} ${98 - H / 2})`}>
+            <rect class="rc-dev" width={W} height={H} rx="8" />
+            <text x={W / 2} y="17" text-anchor="middle" class="rc-dev-name">B</text>
+            <text x={W / 2} y="34" text-anchor="middle" class="rc-dev-val" data-rc-val="b" />
+          </g>
+          <g transform={`translate(${276 - W / 2} ${65 - H / 2})`}>
+            <rect class="rc-dev" width={W} height={H} rx="8" />
+            <text x={W / 2} y="17" text-anchor="middle" class="rc-dev-name">C</text>
+            <text x={W / 2} y="34" text-anchor="middle" class="rc-dev-val" data-rc-val="c" />
+          </g>
+          <circle class="rc-end" cx="8" cy="65" r="5" />
+          <circle class="rc-end" cx="352" cy="65" r="5" />
+        </svg>
+        <div class="dg-result">
+          <div class="rc-formula-label">並列部分を 1 つの装置とみなす → [1 − (1 − A)(1 − B)] × C</div>
+          <div class="dg-mono rc-formula" data-rc-formula="mixed-p"></div>
+          <div class="dg-mono rc-formula" data-rc-formula="mixed"></div>
+          <div class="rc-bar"><span data-rc-bar="mixed"></span></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</Figure>
+
+<script>
+  /** 浮動小数点の誤差を消して表示（0.8100000000000001 → 0.81） */
+  const fmt = (n: number) => String(parseFloat(n.toFixed(6)));
+
+  function init(root: HTMLElement) {
+    const inputs = [...root.querySelectorAll<HTMLInputElement>('[data-rc-in]')];
+    const update = () => {
+      const v: Record<string, number> = {};
+      for (const i of inputs) v[i.dataset.rcIn!] = Number(i.value);
+      const { a, b, c } = v;
+      for (const o of root.querySelectorAll<HTMLElement>('[data-rc-out]')) o.textContent = v[o.dataset.rcOut!].toFixed(2);
+      for (const t of root.querySelectorAll<SVGTextElement>('[data-rc-val]')) t.textContent = fmt(v[t.dataset.rcVal!]);
+
+      const series = a * b;
+      const par = 1 - (1 - a) * (1 - b);
+      const mixed = par * c;
+      const out: Record<string, [string, number?]> = {
+        series: [`${fmt(a)} × ${fmt(b)} = ${fmt(series)}`, series],
+        parallel: [`1 − (1 − ${fmt(a)})(1 − ${fmt(b)})\n= 1 − ${fmt(1 - a)} × ${fmt(1 - b)}\n= 1 − ${fmt((1 - a) * (1 - b))} = ${fmt(par)}`, par],
+        'mixed-p': [`並列部分: 1 − (1 − ${fmt(a)})(1 − ${fmt(b)}) = ${fmt(par)}`],
+        mixed: [`全体: ${fmt(par)} × ${fmt(c)} = ${fmt(mixed)}`, mixed],
+      };
+      for (const [k, [text, val]] of Object.entries(out)) {
+        root.querySelector<HTMLElement>(`[data-rc-formula="${k}"]`)!.textContent = text;
+        const bar = root.querySelector<HTMLElement>(`[data-rc-bar="${k}"]`);
+        if (bar && val !== undefined) {
+          bar.style.width = `${val * 100}%`;
+          bar.textContent = `稼働率 ${fmt(val)}`;
+        }
+      }
+    };
+    for (const i of inputs) i.addEventListener('input', update);
+    update();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-rc]').forEach(init);
+</script>
+
+<style>
+  .rc-sliders {
+    gap: 8px 20px;
+  }
+  .rc-slider {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .rc-name {
+    font-weight: 700;
+  }
+  .rc-slider input[type='range'] {
+    width: 130px;
+    accent-color: var(--accent);
+  }
+  .rc-slider output {
+    min-width: 2.6em;
+    font-variant-numeric: tabular-nums;
+  }
+  .rc-note {
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+  .rc-panels {
+    display: grid;
+    gap: 14px;
+  }
+  .rc-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+    gap: 6px 16px;
+    align-items: center;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .rc-title {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: 0.95rem;
+  }
+  @media (max-width: 640px) {
+    .rc-panel {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  .rc-panel svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .rc-wire {
+    fill: none;
+    stroke: var(--fg-muted);
+    stroke-width: 2;
+  }
+  .rc-end {
+    fill: var(--fg-muted);
+  }
+  .rc-group {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 4;
+  }
+  .rc-dev {
+    fill: var(--dg-fill);
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+  }
+  :global(.diagram-body) svg .rc-dev-name {
+    font-weight: 700;
+    font-size: 15px;
+  }
+  :global(.diagram-body) svg .rc-dev-val {
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+  }
+  .rc-formula-label {
+    font-size: 0.82rem;
+    color: var(--fg-muted);
+  }
+  .rc-formula {
+    white-space: pre-line;
+    margin-top: 2px;
+    font-size: 0.92rem;
+    overflow-wrap: anywhere;
+  }
+  .rc-bar {
+    margin-top: 6px;
+    height: 24px;
+    border-radius: 6px;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .rc-bar span {
+    display: block;
+    height: 100%;
+    min-width: max-content;
+    padding: 0 8px;
+    background: color-mix(in srgb, var(--accent) 30%, var(--bg));
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 22px;
+    white-space: nowrap;
+    transition: width 0.2s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rc-bar span {
+      transition: none;
+    }
+  }
+</style>

@@ -1,0 +1,432 @@
+---
+/**
+ * L2スイッチの MACアドレス学習をステップ再生で見せる図。
+ * 4 台の PC がフレームを送るたびに、スイッチが送信元 MACアドレスと受信ポートを学習し、
+ * 未学習の宛先はフラッディング、学習済みの宛先は該当ポートだけに転送する様子を示す。
+ *
+ * 使い方（.mdx）:
+ *   <SwitchLearning />
+ */
+import Figure from './Figure.astro';
+
+interface Props {
+  title?: string;
+  caption?: string;
+}
+const { title = 'L2スイッチの MACアドレス学習', caption } = Astro.props;
+
+// ポート番号 = PC の番号 + 1。A, B は上、C, D は下に置く
+const pcs = [
+  { name: 'A', x: 150, top: true },
+  { name: 'B', x: 350, top: true },
+  { name: 'C', x: 150, top: false },
+  { name: 'D', x: 350, top: false },
+];
+const W = 500;
+const swTop = 164;
+const swBottom = 224;
+const pcTopY = 34; // 上の PC の箱の上端
+const pcBottomY = 304; // 下の PC の箱の上端
+const pcH = 50;
+// ケーブルの端点（PC 側 / スイッチ側）
+const cableEnds = (i: number) =>
+  pcs[i].top ? { pc: pcTopY + pcH, sw: swTop } : { pc: pcBottomY, sw: swBottom };
+
+interface Frame {
+  from: number;
+  to: number;
+}
+// 4 つのフレーム。各フレームは「到着・学習」と「転送」の 2 ステップ
+const frames: Frame[] = [
+  { from: 0, to: 1 },
+  { from: 1, to: 0 },
+  { from: 2, to: 3 },
+  { from: 3, to: 2 },
+];
+const sim = frames.map((f, k) => {
+  const known = frames.slice(0, k).map((p) => p.from); // それまでに学習済みの PC
+  const flood = !known.includes(f.to);
+  const outs = flood ? [0, 1, 2, 3].filter((p) => p !== f.from) : [f.to];
+  return { ...f, k, arrive: 2 * k + 1, forward: 2 * k + 2, flood, outs };
+});
+
+const off = 16; // 矢印をケーブルから離す距離
+const inPath = (i: number) => {
+  const e = cableEnds(i);
+  const x = pcs[i].x - off;
+  return `M${x},${e.pc + 4} L${x},${e.sw - 6}`;
+};
+const outPath = (i: number) => {
+  const e = cableEnds(i);
+  const x = pcs[i].x + off;
+  return `M${x},${e.sw + (pcs[i].top ? -4 : 4)} L${x},${e.pc + (pcs[i].top ? 6 : -6)}`;
+};
+const steps = frames.length * 2;
+// フレームの中身の札: 左の PC は矢印の左、右の PC は右側に置く
+const tagW = 116;
+const tagX = (i: number) => (pcs[i].x < W / 2 ? pcs[i].x - off - 8 - tagW : pcs[i].x + off + 8);
+// PC の外側（上の PC は上、下の PC は下）に置く短い文字の y 座標
+const outerY = (i: number) => (pcs[i].top ? pcTopY - 9 : pcBottomY + pcH + 20);
+---
+
+<Figure
+  title={title}
+  caption={caption}
+  steps={steps}
+  intro="電源を入れた直後のスイッチの MACアドレステーブルは空です。PC がフレームを送るたびに、何を覚え、どこへ転送するかを見ていきます。"
+>
+  <div class="swl">
+    <svg class="swl-svg" viewBox={`0 0 ${W} ${pcBottomY + pcH + 30}`} role="img" aria-label="4台の PC が L2スイッチの 4 つのポートにつながっている図">
+      <defs>
+        <marker id="swl-arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="swl-arrowhead"></path>
+        </marker>
+      </defs>
+
+      {/* ケーブル */}
+      {
+        pcs.map((p, i) => {
+          const e = cableEnds(i);
+          return (
+            <line
+              class:list={[
+                'swl-cable',
+                ...sim.filter((s) => s.from === i).map((s) => `swl-at-${s.arrive}`),
+                ...sim.filter((s) => s.outs.includes(i)).map((s) => `swl-at-${s.forward}`),
+              ]}
+              x1={p.x}
+              y1={e.pc}
+              x2={p.x}
+              y2={e.sw}
+            />
+          );
+        })
+      }
+
+      {/* スイッチ本体とポート */}
+      <rect class="swl-switch" x="60" y={swTop} width={W - 120} height={swBottom - swTop} rx="8" />
+      <text class="swl-switch-label" x={W / 2} y={swTop + 36} text-anchor="middle">L2スイッチ</text>
+      {
+        pcs.map((p, i) => (
+          <g>
+            <rect class="swl-port" x={p.x - 13} y={p.top ? swTop - 1 : swBottom - 15} width="26" height="16" rx="3" />
+            <text class="swl-port-label" x={p.x} y={p.top ? swTop + 12 : swBottom - 3} text-anchor="middle">
+              {i + 1}
+            </text>
+          </g>
+        ))
+      }
+
+      {/* PC */}
+      {
+        pcs.map((p, i) => {
+          const y = p.top ? pcTopY : pcBottomY;
+          return (
+            <g>
+              <rect
+                class:list={[
+                  'swl-pc',
+                  ...sim.filter((s) => s.from === i).map((s) => `swl-send-${s.arrive} swl-send-${s.forward}`),
+                ]}
+                x={p.x - 52}
+                y={y}
+                width="104"
+                height={pcH}
+                rx="8"
+              />
+              <text class="swl-pc-name" x={p.x} y={y + 22} text-anchor="middle">
+                PC-{p.name}
+              </text>
+              <text class="swl-pc-mac" x={p.x} y={y + 41} text-anchor="middle">
+                MAC-{p.name}
+              </text>
+            </g>
+          );
+        })
+      }
+
+      {/* 到着: 送信元 PC → スイッチ */}
+      {
+        sim.map((s) => {
+          const e = cableEnds(s.from);
+          const ly = (e.pc + e.sw) / 2 + 4;
+          return (
+            <g class:list={['swl-flow', `swl-only-${s.arrive}`, `swl-only-${s.forward}`]}>
+              <path class="swl-arrow swl-in" d={inPath(s.from)} marker-end="url(#swl-arrow)" />
+              <g class="swl-tag">
+                <rect x={tagX(s.from)} y={ly - 26} width={tagW} height="44" rx="5" />
+                <text x={tagX(s.from) + tagW / 2} y={ly - 8} text-anchor="middle">
+                  宛先 MAC-{pcs[s.to].name}
+                </text>
+                <text x={tagX(s.from) + tagW / 2} y={ly + 11} text-anchor="middle">
+                  送信元 MAC-{pcs[s.from].name}
+                </text>
+              </g>
+            </g>
+          );
+        })
+      }
+
+      {/* 転送: スイッチ → 出力ポート */}
+      {
+        sim.map((s) => (
+          <g class:list={['swl-flow', `swl-only-${s.forward}`]}>
+            {s.outs.map((o) => (
+              <path class="swl-arrow swl-out" d={outPath(o)} marker-end="url(#swl-arrow)" />
+            ))}
+            {s.outs
+              .filter((o) => o !== s.to)
+              .map((o) => (
+                <text class="swl-drop" x={pcs[o].x} y={outerY(o)} text-anchor="middle">
+                  ✕ 自分宛てでないので破棄
+                </text>
+              ))}
+            <text class="swl-recv" x={pcs[s.to].x} y={outerY(s.to)} text-anchor="middle">
+              ✓ 受信
+            </text>
+          </g>
+        ))
+      }
+    </svg>
+
+    <div class="swl-table-wrap">
+      <table class="swl-table">
+        <caption>MACアドレステーブル</caption>
+        <thead>
+          <tr>
+            <th scope="col">MACアドレス</th>
+            <th scope="col">ポート</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            sim.map((s) => (
+              <tr data-step={s.arrive}>
+                <td class="dg-mono">MAC-{pcs[s.from].name}</td>
+                <td class="dg-mono">{s.from + 1}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+      <p class="swl-empty">（空の行はまだ学習していない）</p>
+    </div>
+  </div>
+
+  <Fragment slot="narration">
+    {
+      sim.map((s) => {
+        const from = pcs[s.from].name;
+        const to = pcs[s.to].name;
+        return (
+          <>
+            <p data-step-only={s.arrive}>
+              <strong>
+                PC-{from} → PC-{to} 宛てのフレームがポート {s.from + 1} に届く。
+              </strong>
+              スイッチは送信元 MAC-{from} がポート {s.from + 1} の先にあると学習し、テーブルに登録する。
+            </p>
+            <p data-step-only={s.forward}>
+              {s.flood ? (
+                <>
+                  <strong>宛先 MAC-{to} はまだテーブルにない</strong>
+                  ので、受信したポート以外の全ポート（{s.outs.map((o) => o + 1).join('・')}）に送る（フラッディング）。PC-{to} 以外は自分宛てでないので破棄する。
+                </>
+              ) : (
+                <>
+                  <strong>
+                    宛先 MAC-{to} はポート {s.to + 1} と学習済み
+                  </strong>
+                  なので、ポート {s.to + 1} にだけ転送する。他の PC にはフレームが流れない。
+                </>
+              )}
+            </p>
+          </>
+        );
+      })
+    }
+  </Fragment>
+</Figure>
+
+<style>
+  .swl {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+  .swl-svg {
+    flex: 1 1 320px;
+    max-width: 520px;
+  }
+  .swl-cable {
+    stroke: var(--dg-stroke);
+    stroke-width: 3;
+    transition: stroke 0.3s;
+  }
+  .swl-switch {
+    fill: var(--dg-fill);
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+  }
+  .diagram-body svg .swl-switch-label {
+    font-weight: 700;
+    font-size: 18px;
+  }
+  .swl-port {
+    fill: var(--bg);
+    stroke: var(--dg-stroke);
+  }
+  .diagram-body svg .swl-port-label {
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .swl-pc {
+    fill: var(--bg);
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+    transition: stroke 0.3s, fill 0.3s;
+  }
+  .diagram-body svg .swl-pc-name {
+    font-weight: 700;
+    font-size: 17px;
+  }
+  .diagram-body svg .swl-pc-mac {
+    font-size: 14px;
+    fill: var(--fg-muted);
+  }
+  .swl-arrow {
+    fill: none;
+    stroke-width: 3;
+    stroke-dasharray: 200;
+    stroke-dashoffset: 200;
+    transition: stroke-dashoffset 0.7s ease;
+  }
+  .swl-in {
+    stroke: var(--dg-c2);
+  }
+  .swl-out {
+    stroke: var(--accent);
+  }
+  .swl-arrowhead {
+    fill: context-stroke;
+  }
+  .swl-flow {
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .swl-tag rect {
+    fill: var(--bg);
+    stroke: var(--dg-c2);
+    stroke-width: 1.5;
+  }
+  .diagram-body svg .swl-tag text {
+    font-size: 13.5px;
+  }
+  .diagram-body svg .swl-drop {
+    font-size: 13.5px;
+    fill: var(--fg-muted);
+  }
+  .diagram-body svg .swl-recv {
+    font-size: 15px;
+    font-weight: 700;
+    fill: var(--dg-ok);
+  }
+
+  .swl-table-wrap {
+    flex: 0 1 220px;
+  }
+  .swl-table {
+    width: 100%;
+    margin: 0;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  .swl-table caption {
+    font-weight: 700;
+    text-align: left;
+    padding-bottom: 4px;
+  }
+  .swl-table th,
+  .swl-table td {
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    height: 1.9em;
+  }
+  .swl-table th {
+    background: var(--dg-fill);
+  }
+  .swl-table td {
+    background: var(--bg);
+  }
+  .swl-table tr:global(.is-current) td {
+    background: color-mix(in srgb, var(--dg-c2) 25%, var(--bg));
+    font-weight: 700;
+  }
+  .swl-empty {
+    margin: 4px 0 0;
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+  }
+  /* 未表示の行も枠だけは見せる（テーブルが埋まっていく様子） */
+  .swl-table tbody tr {
+    opacity: 1 !important;
+  }
+  .swl-table tbody tr:not(:global(.is-visible)) td {
+    color: transparent;
+  }
+
+  /* ステップごとの表示（Figure が付ける data-current を使う） */
+  :global([data-current='1']) .swl-only-1,
+  :global([data-current='2']) .swl-only-2,
+  :global([data-current='3']) .swl-only-3,
+  :global([data-current='4']) .swl-only-4,
+  :global([data-current='5']) .swl-only-5,
+  :global([data-current='6']) .swl-only-6,
+  :global([data-current='7']) .swl-only-7,
+  :global([data-current='8']) .swl-only-8 {
+    opacity: 1;
+  }
+  :global([data-current='1']) .swl-only-1 .swl-arrow,
+  :global([data-current='2']) .swl-only-2 .swl-arrow,
+  :global([data-current='3']) .swl-only-3 .swl-arrow,
+  :global([data-current='4']) .swl-only-4 .swl-arrow,
+  :global([data-current='5']) .swl-only-5 .swl-arrow,
+  :global([data-current='6']) .swl-only-6 .swl-arrow,
+  :global([data-current='7']) .swl-only-7 .swl-arrow,
+  :global([data-current='8']) .swl-only-8 .swl-arrow {
+    stroke-dashoffset: 0;
+  }
+  :global([data-current='1']) .swl-at-1,
+  :global([data-current='2']) .swl-at-2,
+  :global([data-current='3']) .swl-at-3,
+  :global([data-current='4']) .swl-at-4,
+  :global([data-current='5']) .swl-at-5,
+  :global([data-current='6']) .swl-at-6,
+  :global([data-current='7']) .swl-at-7,
+  :global([data-current='8']) .swl-at-8 {
+    stroke: var(--accent);
+  }
+  :global([data-current='1']) .swl-send-1,
+  :global([data-current='2']) .swl-send-2,
+  :global([data-current='3']) .swl-send-3,
+  :global([data-current='4']) .swl-send-4,
+  :global([data-current='5']) .swl-send-5,
+  :global([data-current='6']) .swl-send-6,
+  :global([data-current='7']) .swl-send-7,
+  :global([data-current='8']) .swl-send-8 {
+    stroke: var(--dg-c2);
+    stroke-width: 2.5;
+    fill: color-mix(in srgb, var(--dg-c2) 15%, var(--bg));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .swl-arrow,
+    .swl-flow,
+    .swl-cable,
+    .swl-pc {
+      transition: none;
+    }
+  }
+</style>

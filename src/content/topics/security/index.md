@@ -1,4 +1,5 @@
 ---
+icon: security
 title: 情報セキュリティ
 order: 5
 summary: 情報資産を脅威から守るための考え方と技術。CIA、暗号、PKI、攻撃手法と対策を学ぶ

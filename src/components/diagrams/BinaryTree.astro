@@ -1,0 +1,187 @@
+---
+/**
+ * 二分木の図。traversal を指定すると、その順序で節点を 1 つずつなぞるステップ再生になる。
+ *
+ * 使い方（.mdx）:
+ *   <BinaryTree
+ *     title="中間順でなぞる"
+ *     tree={{ v: 8, l: { v: 3, l: { v: 1 }, r: { v: 6 } }, r: { v: 10 } }}
+ *     traversal="in"
+ *   />
+ * - tree: { v: 値, l?: 左の子, r?: 右の子 }
+ * - traversal: 'pre'（先行順）| 'in'（中間順）| 'post'（後行順）。省略すると静的な図
+ */
+import Figure from './Figure.astro';
+
+interface Node {
+  v: number | string;
+  l?: Node;
+  r?: Node;
+}
+interface Props {
+  title?: string;
+  caption?: string;
+  intro?: string;
+  tree: Node;
+  traversal?: 'pre' | 'in' | 'post';
+}
+const { title, caption, intro, tree, traversal } = Astro.props;
+
+interface Placed {
+  node: Node;
+  x: number;
+  y: number;
+  depth: number;
+  parent?: Placed;
+  id: number;
+}
+// 中間順の番号を x 座標、深さを y 座標にする（重ならない簡単な配置）
+const placed: Placed[] = [];
+let col = 0;
+let maxDepth = 0;
+const place = (n: Node, depth: number, parent?: Placed): Placed => {
+  const self: Placed = { node: n, x: 0, y: 0, depth, parent, id: placed.length };
+  placed.push(self);
+  maxDepth = Math.max(maxDepth, depth);
+  if (n.l) place(n.l, depth + 1, self);
+  self.x = col++;
+  if (n.r) place(n.r, depth + 1, self);
+  return self;
+};
+const rootP = place(tree, 0);
+const gapX = 64;
+const gapY = 72;
+const pad = 36;
+const px = (p: Placed) => pad + p.x * gapX;
+const py = (p: Placed) => pad + p.depth * gapY;
+const width = pad * 2 + (col - 1) * gapX;
+const listY = pad + maxDepth * gapY + 56;
+const height = traversal ? listY + 20 : pad * 2 + maxDepth * gapY;
+const byNode = new Map(placed.map((p) => [p.node, p]));
+
+const names = { pre: '先行順（節点 → 左 → 右）', in: '中間順（左 → 節点 → 右）', post: '後行順（左 → 右 → 節点）' };
+const order: { p: Placed; note: string }[] = [];
+const walk = (n: Node | undefined) => {
+  if (!n) return;
+  const p = byNode.get(n)!;
+  const visit = () => {
+    let note = '';
+    if (traversal === 'pre') note = `${n.v} に来たので、まず ${n.v} を取り出す。${n.l ? '次に左部分木へ。' : n.r ? '左の子がないので右部分木へ。' : ''}`;
+    if (traversal === 'in')
+      note = `${n.l ? `${n.v} の左部分木をなぞり終えたので、` : `${n.v} には左の子がないので、`}${n.v} を取り出す。${n.r ? '次は右部分木へ。' : ''}`;
+    if (traversal === 'post') note = `${n.l || n.r ? `${n.v} の部分木をなぞり終えたので、` : `${n.v} は葉なので、`}${n.v} を取り出す。`;
+    order.push({ p, note });
+  };
+  if (traversal === 'pre') visit();
+  walk(n.l);
+  if (traversal === 'in') visit();
+  walk(n.r);
+  if (traversal === 'post') visit();
+};
+if (traversal) walk(tree);
+const stepOf = new Map(order.map((o, i) => [o.p.id, i + 1]));
+void rootP;
+---
+
+<Figure
+  title={title}
+  caption={caption}
+  steps={order.length}
+  intro={intro ?? (traversal ? `${names[traversal]}で節点をなぞり、値を取り出していきます。` : undefined)}
+>
+  <svg class="btree" viewBox={`0 0 ${width} ${height}`} style={`max-width: ${Math.round(width * 1.4)}px; margin: 0 auto;`} role="img" aria-label={title ?? '二分木'}>
+    {placed.filter((p) => p.parent).map((p) => <line class="btree-edge" x1={px(p.parent!)} y1={py(p.parent!)} x2={px(p)} y2={py(p)} />)}
+    {
+      placed.map((p) => (
+        <g>
+          <circle class="btree-node" cx={px(p)} cy={py(p)} r="20" />
+          {stepOf.has(p.id) && (
+            <g class="btree-visit" data-step={stepOf.get(p.id)}>
+              <circle class="btree-visited" cx={px(p)} cy={py(p)} r="20" />
+              <circle class="btree-badge" cx={px(p) + 18} cy={py(p) - 18} r="10" />
+              <text class="btree-badge-num" x={px(p) + 18} y={py(p) - 14} text-anchor="middle">
+                {stepOf.get(p.id)}
+              </text>
+            </g>
+          )}
+          <text class="btree-val" x={px(p)} y={py(p) + 5} text-anchor="middle">
+            {p.node.v}
+          </text>
+        </g>
+      ))
+    }
+    {
+      traversal && (
+        <g>
+          <text class="btree-list-label" x={pad - 20} y={listY}>
+            取り出し順:
+          </text>
+          {order.map((o, i) => (
+            <text class="btree-list" data-step={i + 1} x={pad + 70 + i * 34} y={listY}>
+              {o.p.node.v}
+              {i < order.length - 1 ? ',' : ''}
+            </text>
+          ))}
+        </g>
+      )
+    }
+  </svg>
+  <Fragment slot="narration">
+    {
+      order.map((o, i) => (
+        <p data-step-only={i + 1}>
+          <strong>{i + 1} 番目</strong>：{o.note}
+          {i === order.length - 1 && traversal === 'in' ? ' 二分探索木なので昇順に取り出せた。' : ''}
+        </p>
+      ))
+    }
+  </Fragment>
+</Figure>
+
+<style>
+  .btree-edge {
+    stroke: var(--dg-stroke);
+    stroke-width: 2;
+  }
+  .btree-node {
+    fill: var(--dg-fill);
+    stroke: var(--dg-stroke);
+    stroke-width: 2;
+  }
+  .btree-visited {
+    fill: color-mix(in srgb, var(--dg-ok) 30%, var(--bg));
+    stroke: var(--dg-ok);
+    stroke-width: 2.5;
+  }
+  .btree-visit.is-current .btree-visited {
+    fill: color-mix(in srgb, var(--accent) 30%, var(--bg));
+    stroke: var(--accent);
+    stroke-width: 3.5;
+  }
+  .btree-badge {
+    fill: var(--dg-ok);
+  }
+  .btree-visit.is-current .btree-badge {
+    fill: var(--accent);
+  }
+  :global(.diagram-body) svg .btree-badge-num {
+    font-size: 11px;
+    font-weight: 700;
+    fill: var(--bg);
+  }
+  :global(.diagram-body) svg .btree-val {
+    font-weight: 700;
+    font-size: 15px;
+  }
+  :global(.diagram-body) svg .btree-list-label {
+    font-size: 13px;
+    fill: var(--fg-muted);
+  }
+  :global(.diagram-body) svg .btree-list {
+    font-weight: 700;
+    font-size: 15px;
+  }
+  :global(.diagram-body) svg .btree-list.is-current {
+    fill: var(--accent);
+  }
+</style>

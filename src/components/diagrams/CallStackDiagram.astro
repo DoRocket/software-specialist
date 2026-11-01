@@ -1,0 +1,221 @@
+---
+/**
+ * 関数の呼出しスタックが積まれて戻っていく様子をステップ再生で見せる図（再帰のトレースなど）。
+ *
+ * 使い方（.mdx）:
+ *   <CallStackDiagram
+ *     title="fact(4) の呼出しスタック"
+ *     steps={[
+ *       { stack: [{ name: 'fact(4)', state: '4 × fact(3) の結果待ち' }], note: '…' },
+ *       { stack: [{ name: 'fact(4)', state: '…' }, { name: 'fact(3)', state: '…' }], note: '…' },
+ *       { stack: [{ name: 'fact(4)', state: '4 × 6 = 24' }], ret: '6', note: '…' },
+ *     ]}
+ *   />
+ * - stack: そのステップのスタックの中身（下＝最初に呼ばれたもの → 上＝最後に呼ばれたもの）
+ * - ret: 直前のステップの一番上が取り出され、その戻り値を表示する場合に指定
+ */
+import Figure from './Figure.astro';
+
+interface Frame {
+  name: string;
+  state: string;
+}
+interface Step {
+  stack: Frame[];
+  ret?: string;
+  note: string;
+}
+interface Props {
+  title?: string;
+  caption?: string;
+  intro?: string;
+  steps: Step[];
+}
+const { title, caption, intro, steps } = Astro.props;
+
+const maxDepth = Math.max(...steps.map((s) => s.stack.length));
+const W = 370;
+const fw = 292;
+const fh = 42;
+const gap = 6;
+const fx = 14;
+const top = 44;
+const baseY = top + maxDepth * (fh + gap); // スタックの底
+const H = baseY + 34;
+const yOf = (i: number) => baseY - (i + 1) * (fh + gap);
+
+const snapshots = steps.map((s, k) => {
+  const prev = k === 0 ? [] : steps[k - 1].stack;
+  const pushed = s.stack.length > prev.length;
+  const popped = s.stack.length < prev.length ? prev[prev.length - 1] : undefined;
+  return { ...s, step: k + 1, pushed, popped };
+});
+---
+
+<Figure title={title} caption={caption} steps={steps.length} intro={intro}>
+  <svg class="cs" viewBox={`0 0 ${W} ${H}`} style={`max-width: ${Math.round(W * 1.4)}px; margin: 0 auto;`} role="img" aria-label={title ?? '呼出しスタック'}>
+    {/* スタックの入れ物 */}
+    <path class="cs-box" d={`M${fx - 8},${top - 8} V${baseY + 4} H${fx + fw + 8} V${top - 8}`} />
+    <text class="cs-caption" x={fx + fw / 2} y={baseY + 26} text-anchor="middle">
+      スタック（下が先に積まれたもの）
+    </text>
+    <g data-step-only="0">
+      <text class="cs-empty" x={fx + fw / 2} y={baseY - 18} text-anchor="middle">
+        （空）
+      </text>
+    </g>
+    {
+      snapshots.map((s) => (
+        <g class="cs-snap" data-step-only={s.step}>
+          {s.stack.map((f, i) => {
+            const top = i === s.stack.length - 1;
+            return (
+              <g class:list={['cs-frame', { 'is-top': top, 'is-pushed': top && s.pushed, 'is-updated': top && !!s.ret }]}>
+                <rect x={fx} y={yOf(i)} width={fw} height={fh} rx="7" />
+                <text class="cs-name" x={fx + 12} y={yOf(i) + fh / 2 + 5}>
+                  {f.name}
+                </text>
+                <text class="cs-state" x={fx + 78} y={yOf(i) + fh / 2 + 5}>
+                  {f.state}
+                </text>
+              </g>
+            );
+          })}
+          {s.stack.length === 0 && !s.popped && (
+            <text class="cs-empty" x={fx + fw / 2} y={baseY - 18} text-anchor="middle">
+              （空）
+            </text>
+          )}
+          {s.popped && (
+            <g class="cs-popped">
+              <rect x={fx} y={yOf(s.stack.length)} width={fw} height={fh} rx="7" />
+              <text class="cs-name" x={fx + 12} y={yOf(s.stack.length) + fh / 2 + 5}>
+                {s.popped.name}
+              </text>
+            </g>
+          )}
+          {s.ret && (
+            <g class="cs-ret">
+              <path
+                class="cs-ret-arrow"
+                d={`M${fx + fw + 16},${yOf(s.stack.length) + fh / 2} q20,0 20,${fh / 2 + gap} t-20,${fh / 2 + gap - 4}`}
+                marker-end="url(#cs-arrowhead)"
+              />
+              <text class="cs-ret-label" x={fx + fw + 38} y={yOf(s.stack.length) + fh + 8}>
+                {s.ret}
+              </text>
+            </g>
+          )}
+          <text class="cs-action" x={fx} y="22">
+            {s.ret ? '戻り：一番上を取り出し、戻り値を渡す' : '呼出し：新しい呼出しを一番上に積む'}
+          </text>
+        </g>
+      ))
+    }
+    <defs>
+      <marker id="cs-arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" class="cs-arrowhead"></path>
+      </marker>
+    </defs>
+  </svg>
+  <Fragment slot="narration">
+    {
+      snapshots.map((s) => (
+        <p data-step-only={s.step}>
+          <strong>{s.step}.</strong> {s.note}
+        </p>
+      ))
+    }
+  </Fragment>
+</Figure>
+
+<style>
+  .cs-box {
+    fill: none;
+    stroke: var(--dg-stroke);
+    stroke-width: 3;
+  }
+  :global(.diagram-body) svg .cs-caption,
+  :global(.diagram-body) svg .cs-empty {
+    font-size: 12px;
+    fill: var(--fg-muted);
+  }
+  .cs-frame rect {
+    fill: var(--dg-fill);
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+  }
+  .cs-frame.is-top rect {
+    stroke: var(--accent);
+    stroke-width: 2.5;
+  }
+  .cs-frame.is-updated rect {
+    fill: color-mix(in srgb, var(--dg-ok) 22%, var(--bg));
+    stroke: var(--dg-ok);
+  }
+  :global(.diagram-body) svg .cs-name {
+    font-weight: 700;
+    font-size: 14px;
+  }
+  :global(.diagram-body) svg .cs-state {
+    font-size: 13.5px;
+  }
+  :global(.diagram-body) svg .cs-action {
+    font-size: 13px;
+    font-weight: 700;
+    fill: var(--accent);
+  }
+  .cs-popped rect {
+    fill: none;
+    stroke: var(--fg-muted);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 4;
+  }
+  .cs-popped {
+    opacity: 0.55;
+  }
+  :global(.diagram-body) svg .cs-popped .cs-name {
+    fill: var(--fg-muted);
+  }
+  .cs-ret-arrow {
+    fill: none;
+    stroke: var(--dg-ok);
+    stroke-width: 2.5;
+  }
+  .cs-arrowhead {
+    fill: var(--dg-ok);
+  }
+  :global(.diagram-body) svg .cs-ret-label {
+    font-weight: 700;
+    font-size: 16px;
+    fill: var(--dg-ok);
+  }
+  .cs-frame.is-pushed {
+    animation: cs-push 0.45s ease;
+  }
+  .cs-popped {
+    animation: cs-pop 0.6s ease;
+  }
+  @keyframes cs-push {
+    from {
+      transform: translateY(-40px);
+      opacity: 0;
+    }
+  }
+  @keyframes cs-pop {
+    from {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    to {
+      opacity: 0.55;
+      transform: translateY(-6px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cs-frame.is-pushed,
+    .cs-popped {
+      animation: none;
+    }
+  }
+</style>

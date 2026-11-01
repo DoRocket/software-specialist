@@ -1,0 +1,375 @@
+---
+/**
+ * 整列アルゴリズムの可視化（棒グラフ）。バブル・選択・挿入ソートを選び、
+ * ステップ送り / 自動再生で「比較中・交換中・確定済み」を色分けして見せる。比較回数・交換回数も数える。
+ *
+ * 使い方（.mdx）:
+ *   <SortVisualizer title="整列のようす" values={[5, 3, 8, 1]} />
+ * - values: 最初のデータ（「例題に戻す」でこの並びに戻る）。省略時は 8 個
+ * - algorithm: 'bubble' | 'selection' | 'insertion'（最初に選ばれているもの）
+ * - shuffleSize: 「シャッフル」で作るデータの個数（既定 8）
+ */
+import Figure from './Figure.astro';
+
+interface Props {
+  title?: string;
+  caption?: string;
+  values?: number[];
+  algorithm?: 'bubble' | 'selection' | 'insertion';
+  shuffleSize?: number;
+}
+const { title, caption, values = [5, 3, 8, 1, 7, 2, 6, 4], algorithm = 'bubble', shuffleSize = 8 } = Astro.props;
+const algos = [
+  { key: 'bubble', label: 'バブルソート' },
+  { key: 'selection', label: '選択ソート' },
+  { key: 'insertion', label: '挿入ソート' },
+];
+---
+
+<Figure title={title} caption={caption}>
+  <div class="sv" data-sort-vis data-values={JSON.stringify(values)} data-algo={algorithm} data-shuffle={shuffleSize}>
+    <div class="dg-controls sv-top">
+      <label>
+        アルゴリズム
+        <select data-algo-select>
+          {algos.map((a) => <option value={a.key} selected={a.key === algorithm}>{a.label}</option>)}
+        </select>
+      </label>
+      <button type="button" data-act="shuffle">シャッフル</button>
+      <button type="button" data-act="sample">例題のデータに戻す</button>
+    </div>
+
+    <div class="sv-chart" data-chart aria-hidden="true"></div>
+    <p class="sv-array dg-mono" data-array aria-live="off"></p>
+
+    <div class="sv-stats">
+      <span>比較 <strong class="dg-mono" data-comps>0</strong> 回</span>
+      <span>交換 <strong class="dg-mono" data-swaps>0</strong> 回</span>
+      <span class="sv-legend">
+        <i class="sv-key is-cmp"></i>比較中 <i class="sv-key is-swp"></i>交換 <i class="sv-key is-done"></i><span data-done-label>確定済み</span>
+        <span class="sv-min-key" data-min-label hidden></span>
+      </span>
+    </div>
+
+    <div class="diagram-narration" aria-live="polite"><p data-note></p></div>
+    <div class="diagram-controls">
+      <button type="button" data-act="reset" aria-label="最初に戻す">⟲</button>
+      <button type="button" data-act="prev" aria-label="前のステップ">‹ 前へ</button>
+      <button type="button" data-act="play" aria-pressed="false">▶ 再生</button>
+      <button type="button" data-act="next" aria-label="次のステップ">次へ ›</button>
+      <span class="diagram-count" data-count>0 / 0</span>
+    </div>
+  </div>
+</Figure>
+
+<script>
+  type Item = { id: number; v: number };
+  type Frame = {
+    arr: Item[];
+    cmp?: [number, number];
+    swp?: [number, number];
+    min?: number;
+    done: number[];
+    comps: number;
+    swaps: number;
+    note: string;
+  };
+
+  const INTERVAL_MS = 750;
+
+  function trace(algo: string, input: number[]): Frame[] {
+    const a: Item[] = input.map((v, id) => ({ id, v }));
+    const n = a.length;
+    const frames: Frame[] = [];
+    let comps = 0;
+    let swaps = 0;
+    let done: number[] = [];
+    const push = (f: Omit<Frame, 'arr' | 'done' | 'comps' | 'swaps'>) =>
+      frames.push({ arr: a.slice(), done: done.slice(), comps, swaps, ...f });
+    const swap = (i: number, j: number) => {
+      [a[i], a[j]] = [a[j], a[i]];
+      swaps++;
+    };
+
+    push({ note: '整列前のデータです。「次へ」か「再生」で 1 手ずつ進みます。' });
+
+    if (algo === 'bubble') {
+      for (let p = 0; p < n - 1; p++) {
+        for (let j = 0; j < n - 1 - p; j++) {
+          comps++;
+          const big = a[j].v > a[j + 1].v;
+          push({ cmp: [j, j + 1], note: `パス${p + 1}: 隣どうしの ${a[j].v} と ${a[j + 1].v} を比較する。${big ? '順序が逆なので交換する。' : '順序どおりなのでそのまま。'}` });
+          if (big) {
+            swap(j, j + 1);
+            push({ swp: [j, j + 1], note: `${a[j + 1].v} と ${a[j].v} を交換した。` });
+          }
+        }
+        done.push(n - 1 - p);
+        push({ note: `パス${p + 1} 終了: 最大の ${a[n - 1 - p].v} が右端に確定した。` });
+      }
+      done.push(0);
+    } else if (algo === 'selection') {
+      for (let i = 0; i < n - 1; i++) {
+        let m = i;
+        push({ min: m, note: `パス${i + 1}: 未整列部分（左から ${i + 1} 番目以降）の最小値を探す。まず ${a[i].v} を仮の最小値とする。` });
+        for (let j = i + 1; j < n; j++) {
+          comps++;
+          const smaller = a[j].v < a[m].v;
+          push({ cmp: [m, j], min: m, note: `仮の最小値 ${a[m].v} と ${a[j].v} を比較する。${smaller ? `${a[j].v} の方が小さいので最小値を更新する。` : ''}` });
+          if (smaller) m = j;
+        }
+        if (m !== i) {
+          swap(i, m);
+          done.push(i);
+          push({ swp: [i, m], note: `最小値 ${a[i].v} を未整列部分の先頭 ${a[m].v} と交換し、${a[i].v} が確定した。` });
+        } else {
+          done.push(i);
+          push({ note: `最小値 ${a[i].v} は既に未整列部分の先頭にあるので交換しない。${a[i].v} が確定した。` });
+        }
+      }
+      done.push(n - 1);
+    } else {
+      done = [0];
+      push({ note: '先頭の 1 個を「整列済み部分」とみなし、2 個目から順に挿入していく。' });
+      for (let i = 1; i < n; i++) {
+        push({ min: i, note: `${a[i].v} を、左側の整列済み部分の正しい位置に挿入する。` });
+        let j = i;
+        while (j > 0) {
+          comps++;
+          const big = a[j - 1].v > a[j].v;
+          push({ cmp: [j - 1, j], note: `${a[j - 1].v} と ${a[j].v} を比較する。${big ? `${a[j - 1].v} の方が大きいので、隣と交換して左へ進める。` : '順序どおりなので、ここが挿入位置。'}` });
+          if (!big) break;
+          swap(j - 1, j);
+          push({ swp: [j - 1, j], note: `${a[j].v} と ${a[j - 1].v} を交換した。` });
+          j--;
+        }
+        done = Array.from({ length: i + 1 }, (_, k) => k);
+        push({ note: `左から ${i + 1} 個が整列済みになった。` });
+      }
+    }
+    done = a.map((_, i) => i);
+    push({ note: `完了: 昇順に並んだ。比較 ${comps} 回、交換 ${swaps} 回。` });
+    return frames;
+  }
+
+  function setup(root: HTMLElement) {
+    const sample: number[] = JSON.parse(root.dataset.values ?? '[]');
+    const shuffleSize = Number(root.dataset.shuffle ?? 8);
+    const chart = root.querySelector<HTMLElement>('[data-chart]')!;
+    const select = root.querySelector<HTMLSelectElement>('[data-algo-select]')!;
+    const playBtn = root.querySelector<HTMLButtonElement>('[data-act="play"]')!;
+    const q = (s: string) => root.querySelector<HTMLElement>(s)!;
+    let data = sample.slice();
+    let frames: Frame[] = [];
+    let cur = 0;
+    let timer: number | undefined;
+    let bars = new Map<number, HTMLElement>();
+
+    const build = () => {
+      frames = trace(select.value, data);
+      cur = 0;
+      chart.replaceChildren();
+      bars = new Map();
+      const max = Math.max(...data);
+      data.forEach((v, id) => {
+        const bar = document.createElement('div');
+        bar.className = 'sv-bar';
+        bar.style.setProperty('--h', String(v / max));
+        bar.style.width = `${100 / data.length}%`;
+        bar.innerHTML = `<span class="sv-fill"></span><span class="sv-val">${v}</span>`;
+        chart.append(bar);
+        bars.set(id, bar);
+      });
+      q('[data-done-label]').textContent = select.value === 'insertion' ? '整列済み部分' : '確定済み';
+      const minLabel = q('[data-min-label]');
+      minLabel.hidden = select.value === 'bubble';
+      minLabel.innerHTML = select.value === 'selection' ? '<u>下線</u>: 仮の最小値' : '<u>下線</u>: 挿入する値';
+      render();
+    };
+
+    const render = () => {
+      const f = frames[cur];
+      f.arr.forEach((it, pos) => {
+        const bar = bars.get(it.id)!;
+        bar.style.transform = `translateX(${pos * 100}%)`;
+        bar.classList.toggle('is-cmp', !!f.cmp?.includes(pos));
+        bar.classList.toggle('is-swp', !!f.swp?.includes(pos));
+        bar.classList.toggle('is-done', f.done.includes(pos) && !f.cmp?.includes(pos) && !f.swp?.includes(pos));
+        bar.classList.toggle('is-min', f.min === pos);
+      });
+      q('[data-array]').textContent = `[${f.arr.map((i) => i.v).join(', ')}]`;
+      q('[data-comps]').textContent = String(f.comps);
+      q('[data-swaps]').textContent = String(f.swaps);
+      q('[data-note]').textContent = f.note;
+      q('[data-count]').textContent = `${cur} / ${frames.length - 1}`;
+    };
+
+    const stop = () => {
+      window.clearInterval(timer);
+      timer = undefined;
+      playBtn.textContent = '▶ 再生';
+      playBtn.setAttribute('aria-pressed', 'false');
+    };
+    const play = () => {
+      if (cur >= frames.length - 1) cur = 0;
+      render();
+      playBtn.textContent = '❚❚ 一時停止';
+      playBtn.setAttribute('aria-pressed', 'true');
+      timer = window.setInterval(() => {
+        cur++;
+        render();
+        if (cur >= frames.length - 1) stop();
+      }, INTERVAL_MS);
+    };
+
+    root.addEventListener('click', (e) => {
+      const act = (e.target as Element).closest<HTMLButtonElement>('[data-act]')?.dataset.act;
+      if (!act) return;
+      if (act === 'play') {
+        if (timer === undefined) play();
+        else stop();
+        return;
+      }
+      stop();
+      if (act === 'next') cur = Math.min(frames.length - 1, cur + 1);
+      if (act === 'prev') cur = Math.max(0, cur - 1);
+      if (act === 'reset') cur = 0;
+      if (act === 'shuffle') {
+        const pool = Array.from({ length: 15 }, (_, i) => i + 1);
+        for (let i = pool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+        data = pool.slice(0, shuffleSize);
+        build();
+        return;
+      }
+      if (act === 'sample') {
+        data = sample.slice();
+        build();
+        return;
+      }
+      render();
+    });
+    select.addEventListener('change', () => {
+      stop();
+      build();
+    });
+    build();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-sort-vis]').forEach(setup);
+</script>
+
+<style>
+  .sv-chart {
+    position: relative;
+    height: 200px;
+    margin: 4px 0 6px;
+    border-bottom: 2px solid var(--dg-stroke);
+  }
+  .sv-chart :global(.sv-bar) {
+    --c: var(--dg-c1);
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0 4px;
+    box-sizing: border-box;
+    transition: transform 0.4s ease;
+  }
+  .sv-chart :global(.sv-fill) {
+    width: 100%;
+    max-width: 56px;
+    height: calc(var(--h) * (100% - 22px));
+    border-radius: 6px 6px 0 0;
+    border: 2px solid var(--c);
+    border-bottom: none;
+    background: color-mix(in srgb, var(--c) 28%, var(--bg));
+    box-sizing: border-box;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    order: 1;
+  }
+  .sv-chart :global(.sv-val) {
+    order: 0;
+    font-weight: 700;
+    font-size: 0.85rem;
+    line-height: 22px;
+    font-variant-numeric: tabular-nums;
+  }
+  .sv-chart :global(.sv-bar.is-done) {
+    --c: var(--dg-ok);
+  }
+  .sv-chart :global(.sv-bar.is-cmp) {
+    --c: var(--dg-c3);
+  }
+  .sv-chart :global(.sv-bar.is-swp) {
+    --c: var(--dg-warn);
+  }
+  .sv-chart :global(.sv-bar.is-cmp .sv-fill),
+  .sv-chart :global(.sv-bar.is-swp .sv-fill) {
+    background: color-mix(in srgb, var(--c) 55%, var(--bg));
+  }
+  .sv-chart :global(.sv-bar.is-min .sv-val) {
+    color: var(--accent);
+    text-decoration: underline 3px;
+    text-underline-offset: 3px;
+  }
+  .sv-array {
+    margin: 0 0 6px;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--fg-muted);
+  }
+  .sv-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    align-items: center;
+    font-size: 0.9rem;
+  }
+  .sv-stats strong {
+    font-size: 1.05rem;
+  }
+  .sv-legend {
+    margin-left: auto;
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+  }
+  .sv-key {
+    display: inline-block;
+    width: 0.9em;
+    height: 0.9em;
+    border-radius: 2px;
+    vertical-align: -0.1em;
+    margin: 0 3px 0 8px;
+    border: 2px solid var(--c);
+    background: color-mix(in srgb, var(--c) 55%, var(--bg));
+  }
+  .sv-min-key {
+    margin-left: 8px;
+  }
+  .sv-min-key :global(u) {
+    color: var(--accent);
+    text-decoration-thickness: 2px;
+  }
+  .sv-key.is-cmp {
+    --c: var(--dg-c3);
+  }
+  .sv-key.is-swp {
+    --c: var(--dg-warn);
+  }
+  .sv-key.is-done {
+    --c: var(--dg-ok);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sv-chart :global(.sv-bar),
+    .sv-chart :global(.sv-fill) {
+      transition: none;
+    }
+  }
+</style>

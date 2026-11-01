@@ -1,0 +1,394 @@
+---
+/**
+ * IEEE 754 単精度（binary32）のビット配置を、符号部・指数部・仮数部に色分けして表示する部品。
+ * ビットをクリックして切り替えたり、10進数を入力したりすると、各部の意味と値を即時に表示する。
+ * 下に単精度・倍精度のビット数の比較（比率どおりの帯）を表示する。
+ *
+ * 使い方（.mdx）:
+ *   <FloatBitLayout title="−6.5 の単精度表現" bits="1 10000001 10100000000000000000000" />
+ * - bits: 32 桁の 0/1（空白は無視）。省略時は 0
+ * - formats: false で形式比較の帯を出さない
+ */
+import Figure from './Figure.astro';
+
+interface Props {
+  title?: string;
+  caption?: string;
+  bits?: string;
+  formats?: boolean;
+}
+const { title, caption, bits = '0'.repeat(32), formats = true } = Astro.props;
+const clean = bits.replace(/\s+/g, '').padEnd(32, '0').slice(0, 32);
+const groups = [
+  { key: 'sign', label: '符号部', sub: '1ビット', from: 0, to: 1 },
+  { key: 'exp', label: '指数部', sub: '8ビット', from: 1, to: 9 },
+  { key: 'frac', label: '仮数部', sub: '23ビット', from: 9, to: 32 },
+];
+const fmts = [
+  { name: '単精度（32ビット）', parts: [1, 8, 23] },
+  { name: '倍精度（64ビット）', parts: [1, 11, 52] },
+];
+---
+
+<Figure title={title} caption={caption}>
+  <div class="fp" data-float-layout data-bits={clean}>
+    <div class="fp-bits" role="group" aria-label="32ビット（クリックで 0 と 1 を切り替え）">
+      {
+        groups.map((g) => (
+          <div class:list={['fp-group', `fp-${g.key}`]}>
+            <div class="fp-label">
+              <strong>{g.label}</strong>
+              <span>{g.sub}</span>
+            </div>
+            <div class="fp-cells">
+              {[...clean.slice(g.from, g.to)].map((b, i) => (
+                <button
+                  type="button"
+                  class="fp-cell dg-mono"
+                  data-idx={g.from + i}
+                  aria-pressed={b === '1' ? 'true' : 'false'}
+                  aria-label={`${g.label} ${i + 1} ビット目`}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+
+    <dl class="fp-decode">
+      <div class="fp-sign">
+        <dt>符号部</dt>
+        <dd data-out="sign"></dd>
+      </div>
+      <div class="fp-exp">
+        <dt>指数部</dt>
+        <dd data-out="exp"></dd>
+      </div>
+      <div class="fp-frac">
+        <dt>仮数部</dt>
+        <dd data-out="frac"></dd>
+      </div>
+    </dl>
+    <p class="dg-result fp-value" aria-live="polite">
+      <span class="fp-formula dg-mono" data-out="formula"></span>
+      <span class="fp-hex">16進数 <span class="dg-mono" data-out="hex"></span></span>
+    </p>
+
+    <div class="dg-controls fp-controls">
+      <label>
+        10進数を入力
+        <input type="text" inputmode="decimal" size="10" data-dec placeholder="例: 0.1" />
+      </label>
+      <button type="button" data-act="reset">最初の値に戻す</button>
+    </div>
+    <p class="fp-msg" data-msg hidden></p>
+
+    {
+      formats && (
+        <div class="fp-formats" aria-label="形式ごとのビット数の比較">
+          {fmts.map((f) => (
+            <div class="fp-fmt">
+              <span class="fp-fmt-name">{f.name}</span>
+              <div class="fp-bar" style={`width: ${(f.parts.reduce((a, b) => a + b) / 64) * 100}%`}>
+                {f.parts.map((n, i) => (
+                  <span class:list={['fp-seg', `fp-seg-${i}`]} style={`flex: ${n} 0 0`}>
+                    {n}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+          <p class="fp-legend">
+            <span class="fp-key fp-seg-0" />
+            符号部 <span class="fp-key fp-seg-1" />
+            指数部 <span class="fp-key fp-seg-2" />
+            仮数部（数字はビット数。帯の長さはビット数に比例）
+          </p>
+        </div>
+      )
+    }
+  </div>
+</Figure>
+
+<script>
+  const BIAS = 127;
+
+  function setup(root: HTMLElement) {
+    const initial = root.dataset.bits ?? '0'.repeat(32);
+    let bits = [...initial].map(Number);
+    const cells = [...root.querySelectorAll<HTMLButtonElement>('[data-idx]')];
+    const out = (k: string) => root.querySelector<HTMLElement>(`[data-out="${k}"]`)!;
+    const input = root.querySelector<HTMLInputElement>('[data-dec]')!;
+    const msg = root.querySelector<HTMLElement>('[data-msg]')!;
+    const view = new DataView(new ArrayBuffer(4));
+
+    const word = () => bits.reduce((acc, b) => acc * 2 + b, 0) >>> 0;
+    const minus = (s: string) => s.replace(/-/g, '−');
+
+    const render = () => {
+      cells.forEach((c) => {
+        const b = bits[Number(c.dataset.idx)];
+        c.textContent = String(b);
+        c.setAttribute('aria-pressed', b ? 'true' : 'false');
+      });
+      const s = bits[0];
+      const expBits = bits.slice(1, 9).join('');
+      const fracBits = bits.slice(9).join('');
+      const e = parseInt(expBits, 2);
+      const fracTrim = fracBits.replace(/0+$/, '');
+      view.setUint32(0, word());
+      const v = view.getFloat32(0);
+
+      out('sign').textContent = `${s} → ${s ? '負' : '正'}`;
+      let formula: string;
+      if (e === 0) {
+        out('exp').textContent = `${expBits} = 0 → 全ビット 0（0 または非正規化数として予約）`;
+        out("frac").innerHTML = fracTrim ? `${fracBits} → (0.${fracTrim})<sub>2</sub>（暗黙の 1 はない）` : `${fracBits} → 0`;
+        formula = fracTrim ? `値 = ${s ? '−' : ''}(0.${fracTrim})<sub>2</sub> × 2<sup>−126</sup> = ${minus(String(v))}` : `値 = ${s ? '−' : '+'}0`;
+      } else if (e === 255) {
+        out('exp').textContent = `${expBits} = 255 → 全ビット 1（無限大・NaN として予約）`;
+        out('frac').textContent = fracTrim ? `${fracBits} → 0 以外` : `${fracBits} → 0`;
+        formula = fracTrim ? '値 = NaN（非数）' : `値 = ${s ? '−' : '+'}∞（無限大）`;
+      } else {
+        out('exp').textContent = `${expBits} = ${e} → 指数 ${e} − ${BIAS} = ${minus(String(e - BIAS))}`;
+        out("frac").innerHTML = `${fracTrim || '0'}… → 暗黙の 1 を補って (1.${fracTrim || "0"})<sub>2</sub>`;
+        formula = `値 = ${s ? '−' : ''}(1.${fracTrim || "0"})<sub>2</sub> × 2<sup>${minus(String(e - BIAS))}</sup> = ${minus(String(v))}`;
+      }
+      out('formula').innerHTML = formula;
+      out('hex').textContent = word().toString(16).toUpperCase().padStart(8, '0');
+    };
+
+    const setFromWord = (w: number) => {
+      bits = [...(w >>> 0).toString(2).padStart(32, '0')].map(Number);
+    };
+
+    root.addEventListener('click', (ev) => {
+      const t = ev.target as HTMLElement;
+      const cell = t.closest<HTMLButtonElement>('[data-idx]');
+      if (cell) {
+        const i = Number(cell.dataset.idx);
+        bits[i] = bits[i] ? 0 : 1;
+        msg.hidden = true;
+        render();
+        return;
+      }
+      if (t.closest('[data-act="reset"]')) {
+        bits = [...initial].map(Number);
+        input.value = '';
+        msg.hidden = true;
+        render();
+      }
+    });
+
+    input.addEventListener('input', () => {
+      const raw = input.value.trim().replace(/[−ー]/g, '-').replace(/，/g, '.');
+      if (raw === '') {
+        msg.hidden = true;
+        return;
+      }
+      const n = Number(raw);
+      if (!Number.isFinite(n)) {
+        msg.textContent = '数値を入力してください（例: 0.75、−6.5、0.1）。';
+        msg.hidden = false;
+        return;
+      }
+      view.setFloat32(0, n);
+      setFromWord(view.getUint32(0));
+      const stored = view.getFloat32(0);
+      if (stored !== n) {
+        msg.textContent = Number.isFinite(stored)
+          ? `${minus(raw)} は単精度で正確に表せないため、最も近い ${minus(String(stored))} が格納されます（丸め誤差）。`
+          : `${minus(raw)} は単精度で表せる範囲を超えるため、無限大になります（オーバフロー）。`;
+        msg.hidden = false;
+      } else {
+        msg.hidden = true;
+      }
+      render();
+    });
+
+    render();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-float-layout]').forEach(setup);
+</script>
+
+<style>
+  .fp {
+    --fp-sign: var(--dg-c4);
+    --fp-exp: var(--dg-c3);
+    --fp-frac: var(--dg-c1);
+  }
+  .fp-bits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 8px;
+    justify-content: center;
+  }
+  .fp-group {
+    --c: var(--fp-frac);
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .fp-sign {
+    --c: var(--fp-sign);
+  }
+  .fp-exp {
+    --c: var(--fp-exp);
+  }
+  .fp-frac {
+    --c: var(--fp-frac);
+  }
+  .fp-label {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    margin-bottom: 4px;
+    padding-bottom: 2px;
+    border-bottom: 3px solid var(--c);
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+  .fp-label span {
+    color: var(--fg-muted);
+    font-size: 0.75rem;
+  }
+  .fp-cells {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+  .fp-cell {
+    width: 1.25em;
+    padding: 4px 0;
+    font-size: 0.9rem;
+    font-weight: 700;
+    border-radius: 4px;
+    border: 1.5px solid var(--c);
+    background: var(--bg);
+    color: var(--fg-muted);
+    cursor: pointer;
+  }
+  .fp-cell[aria-pressed='true'] {
+    background: color-mix(in srgb, var(--c) 30%, var(--bg));
+    color: var(--fg);
+  }
+  .fp-cell:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .fp-decode {
+    margin: 14px 0 8px;
+    display: grid;
+    gap: 4px;
+    font-size: 0.9rem;
+  }
+  .fp-decode div {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+  }
+  .fp-decode dt {
+    flex: none;
+    min-width: 4.5em;
+    padding-left: 8px;
+    border-left: 4px solid var(--c);
+    font-weight: 700;
+  }
+  .fp-decode dd {
+    margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    overflow-wrap: anywhere;
+  }
+  .fp-value {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+    justify-content: space-between;
+    margin: 0 0 12px;
+  }
+  .fp-formula {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+  .fp-hex {
+    color: var(--fg-muted);
+    font-size: 0.85rem;
+  }
+  .fp-hex .dg-mono {
+    color: var(--fg);
+    font-weight: 700;
+  }
+  .fp-controls input {
+    margin-left: 4px;
+    width: 9em;
+  }
+  .fp-msg {
+    margin: -4px 0 12px;
+    font-size: 0.85rem;
+    color: var(--dg-warn);
+  }
+  .fp-formats {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border);
+  }
+  .fp-fmt {
+    display: grid;
+    grid-template-columns: 9.5em 1fr;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+  }
+  .fp-bar {
+    display: flex;
+    height: 24px;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .fp-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.4em;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--fg);
+  }
+  .fp-seg-0 {
+    background: color-mix(in srgb, var(--fp-sign) 45%, var(--bg));
+  }
+  .fp-seg-1 {
+    background: color-mix(in srgb, var(--fp-exp) 45%, var(--bg));
+  }
+  .fp-seg-2 {
+    background: color-mix(in srgb, var(--fp-frac) 35%, var(--bg));
+  }
+  .fp-legend {
+    margin: 6px 0 0;
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+  }
+  .fp-key {
+    display: inline-block;
+    width: 0.9em;
+    height: 0.9em;
+    border-radius: 2px;
+    vertical-align: -0.1em;
+    margin: 0 2px 0 6px;
+  }
+  .fp-key:first-child {
+    margin-left: 0;
+  }
+  @media (max-width: 480px) {
+    .fp-fmt {
+      grid-template-columns: 1fr;
+      gap: 2px;
+    }
+  }
+</style>

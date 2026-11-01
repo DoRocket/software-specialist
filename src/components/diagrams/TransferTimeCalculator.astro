@@ -1,0 +1,258 @@
+---
+/**
+ * 伝送時間の計算機。データ量・回線速度・伝送効率を入れると、
+ * ビット換算 → 実効伝送速度 → 伝送時間 を式つきで表示する。接頭辞は k = 10³, M = 10⁶, G = 10⁹。
+ *
+ * 使い方（.mdx）:
+ *   <TransferTimeCalculator />
+ *   <TransferTimeCalculator size={50} sizeUnit="MB" speed={100} speedUnit="M" efficiency={80} />
+ * - sizeUnit: 'b' | 'kb' | 'Mb' | 'Gb'（ビット）, 'B' | 'kB' | 'MB' | 'GB'（バイト）
+ * - speedUnit: '' | 'k' | 'M' | 'G'（ビット/秒の接頭辞）
+ */
+import Figure from './Figure.astro';
+
+type SizeUnit = 'b' | 'kb' | 'Mb' | 'Gb' | 'B' | 'kB' | 'MB' | 'GB';
+type SpeedUnit = '' | 'k' | 'M' | 'G';
+interface Props {
+  title?: string;
+  caption?: string;
+  size?: number;
+  sizeUnit?: SizeUnit;
+  speed?: number;
+  speedUnit?: SpeedUnit;
+  /** 伝送効率（%） */
+  efficiency?: number;
+}
+const {
+  title = '伝送時間の計算機',
+  caption = '試験の慣例に合わせて k = 10³、M = 10⁶、G = 10⁹ として計算します。',
+  size = 50,
+  sizeUnit = 'MB',
+  speed = 100,
+  speedUnit = 'M',
+  efficiency = 80,
+} = Astro.props;
+
+const sizeUnits: [SizeUnit, string][] = [
+  ['B', 'バイト'],
+  ['kB', 'kバイト'],
+  ['MB', 'Mバイト'],
+  ['GB', 'Gバイト'],
+  ['b', 'ビット'],
+  ['kb', 'kビット'],
+  ['Mb', 'Mビット'],
+  ['Gb', 'Gビット'],
+];
+const speedUnits: [SpeedUnit, string][] = [
+  ['', 'ビット/秒'],
+  ['k', 'kビット/秒'],
+  ['M', 'Mビット/秒'],
+  ['G', 'Gビット/秒'],
+];
+---
+
+<Figure title={title} caption={caption}>
+  <div class="ttc" data-transfer-calc>
+    <div class="dg-controls ttc-controls">
+      <label class="ttc-field">
+        <span>データ量</span>
+        <span class="ttc-pair">
+          <input class="dg-mono" type="number" min="0" step="any" value={size} data-ttc-size />
+          <select data-ttc-size-unit aria-label="データ量の単位">
+            {sizeUnits.map(([v, l]) => <option value={v} selected={v === sizeUnit}>{l}</option>)}
+          </select>
+        </span>
+      </label>
+      <label class="ttc-field">
+        <span>回線速度</span>
+        <span class="ttc-pair">
+          <input class="dg-mono" type="number" min="0" step="any" value={speed} data-ttc-speed />
+          <select data-ttc-speed-unit aria-label="回線速度の単位">
+            {speedUnits.map(([v, l]) => <option value={v} selected={v === speedUnit}>{l}</option>)}
+          </select>
+        </span>
+      </label>
+      <label class="ttc-field">
+        <span>伝送効率</span>
+        <span class="ttc-pair">
+          <input class="dg-mono ttc-eff" type="number" min="1" max="100" step="any" value={efficiency} data-ttc-eff />
+          <span>%</span>
+        </span>
+      </label>
+    </div>
+
+    <p class="ttc-error" data-ttc-error hidden></p>
+
+    <ol class="dg-result ttc-steps" data-ttc-steps>
+      <li>
+        <span class="ttc-step-title">データ量をビットに換算</span>
+        <span class="ttc-formula" data-ttc-out="bits">—</span>
+      </li>
+      <li>
+        <span class="ttc-step-title">実効伝送速度 = 回線速度 × 伝送効率</span>
+        <span class="ttc-formula" data-ttc-out="eff">—</span>
+      </li>
+      <li>
+        <span class="ttc-step-title">伝送時間 = データ量（ビット） ÷ 実効伝送速度</span>
+        <span class="ttc-formula" data-ttc-out="time">—</span>
+      </li>
+    </ol>
+    <p class="ttc-answer">伝送時間: <strong data-ttc-out="answer">—</strong></p>
+  </div>
+</Figure>
+
+<style>
+  .ttc-controls {
+    align-items: flex-end;
+  }
+  .ttc-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .ttc-field > span:first-child {
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+  .ttc-pair {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .ttc-pair input {
+    width: 6.5em;
+  }
+  .ttc-pair .ttc-eff {
+    width: 5em;
+  }
+  .ttc-field input[aria-invalid='true'] {
+    border-color: var(--dg-warn);
+  }
+  .ttc-error {
+    margin: 0 0 10px;
+    padding: 6px 10px;
+    border-left: 4px solid var(--dg-warn);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--dg-warn) 12%, var(--bg));
+    font-size: 0.88rem;
+  }
+  .ttc-steps {
+    margin: 0;
+    padding-left: 2.2em;
+  }
+  .ttc-steps.is-invalid {
+    opacity: 0.4;
+  }
+  .ttc-steps li + li {
+    margin-top: 6px;
+  }
+  .ttc-steps li::marker {
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .ttc-step-title {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+  .ttc-formula {
+    display: block;
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+  .ttc-answer {
+    margin: 10px 0 0;
+    font-size: 1.05rem;
+  }
+  .ttc-answer strong {
+    color: var(--accent);
+    font-size: 1.2rem;
+  }
+</style>
+
+<script>
+  const PREFIX: Record<string, number> = { '': 0, k: 3, M: 6, G: 9 };
+  const SUP: Record<string, string> = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+  const sup = (n: number) => String(n).replace(/[-\d]/g, (d) => SUP[d]);
+
+  /** 有効数字 6 桁で丸め、浮動小数点の誤差（0.30000000000000004 など）を消す */
+  const clean = (v: number) => Number(v.toPrecision(6));
+  const plain = (v: number) => clean(v).toLocaleString('ja-JP', { maximumFractionDigits: 6 });
+  /** 「400 × 10⁶」のように 10 の 3 の倍数乗で表す。1,000 未満ならそのまま */
+  function eng(v: number): string {
+    if (v === 0) return '0';
+    const e = Math.floor(Math.log10(Math.abs(clean(v))) / 3) * 3;
+    if (e === 0) return plain(v);
+    return `${plain(v / 10 ** e)} × 10${sup(e)}`;
+  }
+  function seconds(t: number): string {
+    if (t >= 3600) return `${plain(t)} 秒（約 ${plain(Number((t / 3600).toPrecision(3)))} 時間）`;
+    if (t >= 60) return `${plain(t)} 秒（約 ${plain(Number((t / 60).toPrecision(3)))} 分）`;
+    if (t >= 1 || t === 0) return `${plain(t)} 秒`;
+    if (t >= 1e-3) return `${plain(t * 1e3)} ミリ秒（${plain(t)} 秒）`;
+    return `${plain(t * 1e6)} マイクロ秒（${eng(t)} 秒）`;
+  }
+
+  function setup(root: HTMLElement) {
+    const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+    const sizeIn = $<HTMLInputElement>('[data-ttc-size]');
+    const sizeUnit = $<HTMLSelectElement>('[data-ttc-size-unit]');
+    const speedIn = $<HTMLInputElement>('[data-ttc-speed]');
+    const speedUnit = $<HTMLSelectElement>('[data-ttc-speed-unit]');
+    const effIn = $<HTMLInputElement>('[data-ttc-eff]');
+    const errorEl = $<HTMLElement>('[data-ttc-error]');
+    const stepsEl = $<HTMLElement>('[data-ttc-steps]');
+    const out = (k: string) => $<HTMLElement>(`[data-ttc-out="${k}"]`);
+
+    const update = () => {
+      const size = sizeIn.valueAsNumber;
+      const speed = speedIn.valueAsNumber;
+      const eff = effIn.valueAsNumber;
+      const errors: string[] = [];
+      const bad = (el: HTMLInputElement, ok: boolean, msg: string) => {
+        if (ok) el.removeAttribute('aria-invalid');
+        else el.setAttribute('aria-invalid', 'true');
+        if (!ok) errors.push(msg);
+      };
+      bad(sizeIn, Number.isFinite(size) && size >= 0, 'データ量には 0 以上の数を入力してください。');
+      bad(speedIn, Number.isFinite(speed) && speed > 0, '回線速度には 0 より大きい数を入力してください。');
+      bad(effIn, Number.isFinite(eff) && eff > 0 && eff <= 100, '伝送効率には 0 より大きく 100 以下の数（%）を入力してください。');
+      if (errors.length) {
+        errorEl.hidden = false;
+        errorEl.textContent = errors.join(' ');
+        stepsEl.classList.add('is-invalid');
+        for (const k of ['bits', 'eff', 'time', 'answer']) out(k).textContent = '—';
+        return;
+      }
+      errorEl.hidden = true;
+      stepsEl.classList.remove('is-invalid');
+
+      const u = sizeUnit.value;
+      const isByte = u.endsWith('B');
+      const pe = PREFIX[u.slice(0, -1)];
+      const sizeBase = size * 10 ** pe; // バイトまたはビット
+      const bits = isByte ? sizeBase * 8 : sizeBase;
+      const sizeExpr = pe ? `${plain(size)} × 10${sup(pe)}` : plain(size);
+      out('bits').textContent = isByte
+        ? `${sizeExpr} バイト × 8 = ${eng(bits)} ビット`
+        : `${sizeExpr} ビット（もともとビットなので × 8 は不要）`;
+
+      const sp = PREFIX[speedUnit.value];
+      const rate = speed * 10 ** sp;
+      const effRate = rate * (eff / 100);
+      const speedExpr = sp ? `${plain(speed)} × 10${sup(sp)}` : plain(speed);
+      out('eff').textContent = `${speedExpr} × ${plain(eff / 100)} = ${eng(effRate)} ビット/秒`;
+
+      const t = bits / effRate;
+      out('time').textContent = `${eng(bits)} ÷ (${eng(effRate)}) = ${seconds(t)}`;
+      out('answer').textContent = seconds(t);
+    };
+
+    root.addEventListener('input', update);
+    root.addEventListener('change', update);
+    update();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-transfer-calc]').forEach(setup);
+</script>

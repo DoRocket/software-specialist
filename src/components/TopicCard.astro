@@ -2,6 +2,7 @@
 import type { TopicNode } from '../lib/topics';
 import { countDescendants, topicUrl } from '../lib/topics';
 import ExamBadges from './ExamBadges.astro';
+import CategoryIcon from './CategoryIcon.astro';
 
 interface Props {
   node: TopicNode;
@@ -12,7 +13,16 @@ const count = countDescendants(node);
 ---
 
 <a class="card" href={topicUrl(node.id)} data-deep-exams={node.deepExams.join(' ')}>
-  <span class="card-title">{d.title}</span>
+  {
+    d.icon ? (
+      <span class="card-head">
+        <CategoryIcon name={d.icon} />
+        <span class="card-title">{d.title}</span>
+      </span>
+    ) : (
+      <span class="card-title">{d.title}</span>
+    )
+  }
   {d.summary && <span class="card-summary">{d.summary}</span>}
   <span class="card-meta">
     <ExamBadges exams={node.deepExams} />

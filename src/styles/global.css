@@ -630,3 +630,253 @@ a {
     background-color: var(--shiki-dark-bg) !important;
   }
 }
+
+/* ---------- diagrams（図・アニメーション） ---------- */
+:root {
+  --dg-fill: #eef3ff;
+  --dg-stroke: #9db3e8;
+  --dg-accent: var(--accent);
+  --dg-warn: #d9480f;
+  --dg-ok: #2b8a3e;
+  --dg-c1: #4c6ef5;
+  --dg-c2: #12b886;
+  --dg-c3: #f59f00;
+  --dg-c4: #e64980;
+  --dg-c5: #7950f2;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --dg-fill: #1e2635;
+    --dg-stroke: #3d4f78;
+    --dg-warn: #ff8a50;
+    --dg-ok: #51cf66;
+    --dg-c1: #748ffc;
+    --dg-c2: #38d9a9;
+    --dg-c3: #fcc419;
+    --dg-c4: #f783ac;
+    --dg-c5: #9775fa;
+  }
+}
+.diagram {
+  margin: 1.6em 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-subtle);
+}
+.diagram-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.diagram-body svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 520px;
+  font-family: inherit;
+}
+.diagram-body svg text {
+  fill: var(--fg);
+  font-size: 14px;
+}
+.diagram-narration {
+  min-height: 3.4em;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+.diagram-narration p {
+  margin: 0;
+}
+.diagram-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.diagram-controls button {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 3px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+.diagram-controls button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.diagram-controls button[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+.diagram-count {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.diagram-caption {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  color: var(--fg-muted);
+}
+
+/* ステップ再生: data-step は該当ステップ以降、data-step-only はそのステップだけ表示 */
+[data-stepper] [data-step],
+[data-stepper] [data-step-until],
+[data-stepper] [data-step-only] {
+  opacity: 0;
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+[data-stepper] [data-step-only]:not(.is-visible) {
+  display: none;
+}
+[data-stepper] .is-visible {
+  opacity: 1;
+}
+/* 線を「描く」アニメーション（.dg-draw を付けた線・パス） */
+[data-stepper] .dg-draw,
+[data-stepper] .seq-line {
+  stroke-dasharray: 600;
+  stroke-dashoffset: 600;
+  transition: stroke-dashoffset 0.8s ease;
+}
+[data-stepper] .is-visible .dg-draw,
+[data-stepper] .is-visible.dg-draw,
+[data-stepper] .is-visible .seq-line {
+  stroke-dashoffset: 0;
+}
+[data-stepper] .is-visible .seq-dashed {
+  stroke-dasharray: 6 5;
+}
+
+/* シーケンス図 */
+.seq-actor {
+  fill: var(--dg-fill);
+  stroke: var(--dg-stroke);
+  stroke-width: 1.5;
+}
+.diagram-body svg .seq-actor-label {
+  font-weight: 700;
+}
+.seq-lifeline {
+  stroke: var(--dg-stroke);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+.seq-line {
+  stroke: var(--fg-muted);
+  stroke-width: 2;
+}
+.seq-msg.is-current .seq-line {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+.seq-arrowhead {
+  fill: var(--fg-muted);
+}
+.diagram-body svg .seq-label {
+  font-weight: 700;
+  font-size: 15px;
+}
+.seq-msg.is-current .seq-label {
+  fill: var(--accent);
+}
+.seq-num-bg {
+  fill: var(--accent);
+}
+.diagram-body svg .seq-num {
+  fill: var(--accent-fg);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* インタラクティブな図の共通部品 */
+.dg-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+.dg-controls input,
+.dg-controls select {
+  font: inherit;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.dg-controls button,
+.dg-btn {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 3px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--bg);
+  color: var(--accent);
+  cursor: pointer;
+}
+.dg-result {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 0.92rem;
+}
+.dg-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-stepper] [data-step],
+  [data-stepper] [data-step-only],
+  [data-stepper] .dg-draw,
+  [data-stepper] .seq-line {
+    transition: none;
+  }
+}
+
+/* ---------- category icons ---------- */
+.cat-icon {
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.topic-header-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.topic-header-row .cat-icon {
+  width: 56px;
+  height: 56px;
+}
+
+/* ---------- 数式（KaTeX） ---------- */
+.math-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 1em 0;
+  padding: 4px 0;
+}
+.prose .katex {
+  font-size: 1.08em;
+}

@@ -1,4 +1,5 @@
 ---
+icon: development
 title: システム開発
 order: 6
 summary: 開発プロセス・設計・テストなど、ソフトウェアを作り上げるための技術と手順

@@ -1,0 +1,55 @@
+---
+/**
+ * SVG の中に置く「鍵」の絵。(x, y) は鍵の左上。幅 48・高さ 22 程度。
+ * color は CSS の色（例: 'var(--dg-c2)'）。label を付けると鍵の下に表示する。
+ */
+interface Props {
+  x: number;
+  y: number;
+  color: string;
+  label?: string;
+  sub?: string;
+  class?: string;
+}
+const { x, y, color, label, sub, class: cls } = Astro.props;
+---
+
+<g class:list={['dg-key', cls]} transform={`translate(${x} ${y})`} style={`--key: ${color};`}>
+  <circle cx="11" cy="11" r="10" class="dg-key-bow" />
+  <circle cx="8" cy="11" r="3.5" class="dg-key-hole" />
+  <path d="M20,8 H48 V14 H44 V20 H39 V14 H35 V18 H30 V14 H20 Z" class="dg-key-blade" />
+  {
+    label && (
+      <text x="24" y="38" text-anchor="middle" class="dg-key-label">
+        {label}
+      </text>
+    )
+  }
+  {
+    sub && (
+      <text x="24" y="54" text-anchor="middle" class="dg-key-sub">
+        {sub}
+      </text>
+    )
+  }
+</g>
+
+<style>
+  .dg-key-bow,
+  .dg-key-blade {
+    fill: var(--key);
+    stroke: color-mix(in srgb, var(--key) 60%, var(--fg));
+    stroke-width: 1.2;
+  }
+  .dg-key-hole {
+    fill: var(--bg-subtle);
+  }
+  :global(.diagram-body) svg .dg-key-label {
+    font-size: 14px;
+    font-weight: 700;
+  }
+  :global(.diagram-body) svg .dg-key-sub {
+    font-size: 13px;
+    fill: var(--fg-muted);
+  }
+</style>

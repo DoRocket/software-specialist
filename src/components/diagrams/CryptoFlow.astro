@@ -1,0 +1,262 @@
+---
+/**
+ * 暗号化の流れを絵で見せるステップ再生の図。
+ * - mode="public":    受信者 B が鍵ペアを作る → 公開鍵を公開 → 送信者 A が B の公開鍵で暗号化 → 送る → B が自分の秘密鍵で復号
+ * - mode="symmetric": A と B が同じ共通鍵を共有（鍵配送問題）→ A が共通鍵で暗号化 → 送る → B が同じ共通鍵で復号
+ * どちらも、通信路の途中にいる第三者が暗号文を読めないことを示す。
+ *
+ * 使い方（.mdx）:
+ *   <CryptoFlow mode="public" />
+ *   <CryptoFlow mode="symmetric" />
+ */
+import Figure from './Figure.astro';
+import KeyIcon from './parts/KeyIcon.astro';
+import DocIcon from './parts/DocIcon.astro';
+import PersonIcon from './parts/PersonIcon.astro';
+import { range } from './steps';
+
+interface Props {
+  mode: 'public' | 'symmetric';
+  title?: string;
+  caption?: string;
+}
+const { mode, caption } = Astro.props;
+const isPublic = mode === 'public';
+const title = Astro.props.title ?? (isPublic ? '公開鍵暗号方式（機密性のための暗号化）' : '共通鍵暗号方式');
+
+const PUB = 'var(--dg-c2)';
+const PRIV = 'var(--dg-c4)';
+const COMMON = 'var(--dg-c3)';
+
+// 座標
+const ax = 64;
+const bx = 410;
+const tx = 226;
+const docY = 140;
+const keyY = 226;
+
+// ステップ番号
+const s = isPublic
+  ? { encrypt: 3, send: 4, decrypt: 5, total: 5 }
+  : { encrypt: 2, send: 3, decrypt: 4, total: 4 };
+
+const narration = isPublic
+  ? [
+      '受信者 B が、対になる 2 つの鍵（公開鍵と秘密鍵）の鍵ペアを作ります。秘密鍵は B だけが厳重に保管します。',
+      'B は公開鍵を公開します。公開鍵は誰に知られてもよいので、送信者 A も第三者も入手できます。',
+      '送信者 A は、B の公開鍵で平文を暗号化します（暗号文）。',
+      'A は暗号文を送ります。途中で第三者に盗み見られても、B の公開鍵では復号できません。',
+      'B は自分（B）の秘密鍵で暗号文を復号し、平文に戻します。秘密鍵を持つのは B だけです。',
+    ]
+  : [
+      'A と B は、暗号化と復号に使う同じ鍵（共通鍵）を事前に共有し、第三者には秘密にしておきます。この鍵をどうやって安全に相手へ渡すかが課題です（鍵配送問題）。',
+      '送信者 A は、共通鍵で平文を暗号化します。',
+      'A は暗号文を送ります。途中で第三者に盗み見られても、共通鍵を持たないので復号できません。',
+      '受信者 B は、暗号化に使ったのと同じ共通鍵で復号し、平文に戻します。',
+    ];
+const intro = isPublic
+  ? '送信者 A が、受信者 B だけが読めるように文書を送りたい場面です。'
+  : '送信者 A が、受信者 B だけが読めるように文書を送りたい場面です。';
+const lockColor = isPublic ? PUB : COMMON;
+---
+
+<Figure title={title} caption={caption} steps={s.total} intro={intro}>
+  <svg class="cf" viewBox={`0 0 480 ${isPublic ? 304 : 346}`} style="max-width: 640px; margin: 0 auto;" role="img" aria-label={title}>
+    <!-- 通信路 -->
+    <line class="cf-net" x1={ax + 42} y1={docY} x2={bx - 42} y2={docY} />
+    <text class="cf-net-label" x={tx} y={docY - 10} text-anchor="middle">インターネット</text>
+
+    <PersonIcon x={ax} y={36} label="送信者 A" />
+    <PersonIcon x={bx} y={36} label="受信者 B" />
+    <PersonIcon x={tx} y={232} label="第三者" sub="（盗聴者）" muted />
+
+    <!-- A の手元の文書: 平文 → 暗号文 -->
+    <g class="cf-show" data-on-steps={range(0, s.encrypt - 1)}>
+      <DocIcon x={ax} y={docY} label="平文" />
+    </g>
+    <g class="cf-show" data-on-steps={String(s.encrypt)}>
+      <DocIcon x={ax} y={docY} sealed lockColor={lockColor} label="暗号文" />
+    </g>
+
+    <!-- 送信: A から B へ動く -->
+    <g class="cf-show cf-move" data-on-steps={String(s.send)} style={`--fx: ${ax - bx}px; --fy: 0px;`}>
+      <DocIcon x={bx} y={docY} sealed lockColor={lockColor} label="暗号文" />
+    </g>
+    <g class="cf-show" data-on-steps={String(s.decrypt)}>
+      <DocIcon x={bx} y={docY} label="平文" />
+    </g>
+
+    <!-- 第三者は読めない -->
+    <g class="cf-show" data-on-steps={String(s.send)}>
+      <line class="cf-peek" x1={tx} y1={docY + 6} x2={tx} y2={202} />
+      <g transform={`translate(${tx} ${docY + 22})`}>
+        <circle r="11" class="cf-no-bg" />
+        <path d="M-5,-5 L5,5 M5,-5 L-5,5" class="cf-no-x" />
+      </g>
+      <text class="cf-no-label" x={tx - 18} y={docY + 18} text-anchor="end">{isPublic ? '公開鍵では' : '鍵がないので'}</text>
+      <text class="cf-no-label" x={tx - 18} y={docY + 36} text-anchor="end">{isPublic ? '復号できない' : '読めない'}</text>
+    </g>
+
+    {
+      isPublic ? (
+        <>
+          {/* B の鍵ペア */}
+          <g data-step="1">
+            <rect class="cf-pair" x={bx - 66} y={keyY - 8} width="132" height="58" rx="10" />
+            <text class="cf-pair-label" x={bx} y={keyY + 66} text-anchor="middle">B の鍵ペア</text>
+          </g>
+          <g data-step="1">
+            <KeyIcon x={bx - 58} y={keyY} color={PUB} label="公開鍵" />
+          </g>
+          <g data-step="1" class="cf-hl" data-on-steps={String(s.decrypt)}>
+            <KeyIcon x={bx + 8} y={keyY} color={PRIV} label="秘密鍵" />
+          </g>
+          {/* 公開鍵が A と第三者に渡る */}
+          <g data-step="2" class="cf-move-once cf-hl" data-on-steps={String(s.encrypt)} style={`--fx: ${bx - 58 - (ax - 24)}px; --fy: 0px;`}>
+            <KeyIcon x={ax - 24} y={keyY} color={PUB} label="B の公開鍵" />
+          </g>
+          <g data-step="2" class="cf-move-once" style={`--fx: ${bx - 58 - (tx + 40)}px; --fy: 0px;`}>
+            <KeyIcon x={tx + 40} y={keyY} color={PUB} label="B の公開鍵" />
+          </g>
+        </>
+      ) : (
+        <>
+          <g data-step="1" class="cf-hl" data-on-steps={String(s.encrypt)}>
+            <KeyIcon x={ax - 24} y={keyY} color={COMMON} label="共通鍵" />
+          </g>
+          <g data-step="1" class="cf-hl" data-on-steps={String(s.decrypt)}>
+            <KeyIcon x={bx - 24} y={keyY} color={COMMON} label="共通鍵" sub="（A と同じ鍵）" />
+          </g>
+          <g data-step="1">
+            <path class="cf-share" d={`M${ax},${keyY + 62} Q${tx},${keyY + 120} ${bx},${keyY + 62}`} />
+          </g>
+          <g class="cf-show" data-on-steps="1">
+            <text class="cf-share-label" x={tx} y={keyY + 112} text-anchor="middle">安全に渡せるか？（鍵配送問題）</text>
+          </g>
+        </>
+      )
+    }
+
+    <!-- 暗号化・復号の矢印（鍵 → 文書） -->
+    <g class="cf-show" data-on-steps={String(s.encrypt)}>
+      <path class="cf-op" d={`M${ax + 30},${keyY} Q${ax + 46},${docY + 50} ${ax + 30},${docY + 30}`} marker-end="url(#cf-arrow)" />
+      <text class="cf-op-label" x={ax + 46} y={docY + 60}>暗号化</text>
+    </g>
+    <g class="cf-show" data-on-steps={String(s.decrypt)}>
+      <path
+        class="cf-op"
+        d={isPublic ? `M${bx + 40},${keyY - 2} Q${bx + 52},${docY + 50} ${bx + 30},${docY + 30}` : `M${bx - 30},${keyY} Q${bx - 46},${docY + 50} ${bx - 30},${docY + 30}`}
+        marker-end="url(#cf-arrow)"
+      />
+      <text class="cf-op-label" x={isPublic ? bx + 34 : bx - 46} y={isPublic ? docY + 76 : docY + 60} text-anchor="end">復号</text>
+    </g>
+    <defs>
+      <marker id="cf-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" class="cf-arrowhead"></path>
+      </marker>
+    </defs>
+  </svg>
+  <Fragment slot="narration">
+    {narration.map((n, i) => <p data-step-only={i + 1}>{n}</p>)}
+  </Fragment>
+</Figure>
+
+<script>
+  import '../../scripts/step-on';
+</script>
+
+<style>
+  .cf-net {
+    stroke: var(--dg-stroke);
+    stroke-width: 2;
+    stroke-dasharray: 6 6;
+  }
+  :global(.diagram-body) svg .cf-net-label {
+    font-size: 14px;
+    fill: var(--fg-muted);
+  }
+  .cf-show {
+    opacity: 0;
+    transition: opacity 0.45s ease;
+  }
+  .cf-show.is-on {
+    opacity: 1;
+  }
+  .cf-pair {
+    fill: none;
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 4;
+  }
+  :global(.diagram-body) svg .cf-pair-label {
+    font-size: 14px;
+    fill: var(--fg-muted);
+  }
+  .cf-peek {
+    stroke: var(--dg-warn);
+    stroke-width: 2;
+    stroke-dasharray: 4 4;
+  }
+  .cf-no-bg {
+    fill: var(--bg);
+    stroke: var(--dg-warn);
+    stroke-width: 2;
+  }
+  .cf-no-x {
+    stroke: var(--dg-warn);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+  :global(.diagram-body) svg .cf-no-label {
+    font-size: 14px;
+    font-weight: 700;
+    fill: var(--dg-warn);
+  }
+  .cf-share {
+    fill: none;
+    stroke: var(--dg-c3);
+    stroke-width: 2;
+    stroke-dasharray: 5 5;
+  }
+  :global(.diagram-body) svg .cf-share-label {
+    font-size: 14px;
+    font-weight: 700;
+    fill: var(--dg-warn);
+  }
+  .cf-op {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2.5;
+  }
+  .cf-arrowhead {
+    fill: var(--accent);
+  }
+  :global(.diagram-body) svg .cf-op-label {
+    font-size: 14px;
+    font-weight: 700;
+    fill: var(--accent);
+  }
+  /* 今使っている鍵を強調 */
+  .cf-hl.is-on {
+    filter: drop-shadow(0 0 6px var(--accent));
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .cf-move.is-on,
+    .cf-move-once.is-current {
+      animation: cf-move 1s ease both;
+    }
+  }
+  @keyframes cf-move {
+    from {
+      transform: translate(var(--fx), var(--fy));
+    }
+    to {
+      transform: translate(0, 0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cf-show {
+      transition: none;
+    }
+  }
+</style>
