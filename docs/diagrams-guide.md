@@ -85,6 +85,7 @@ import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.ast
 | `AuditProcessFlow` | システム監査の流れ（監査計画 → 予備調査 → 本調査 → 評価・結論 → 監査報告 → フォローアップ）を各段階の成果物つきでステップ再生。改善の実施は監査対象部門であることを色分けで示す |
 | `IncidentFlow` | インシデント発生 → サービスデスク → エスカレーション → 回避策で回復 → 問題管理（根本原因・既知の誤り）→ 変更管理（RFC）をステップ再生。HTML の箱で組むので狭い画面でも読める（props: example） |
 | `RecoveryTimeline` | 最後のバックアップ → 障害発生 → 業務再開 の時間軸で、失うデータ（RPO と比べる）と停止時間（RTO と比べる）をステップ再生（props: backup, failure, recovery） |
+| `CommunicationPaths` | 人数スライダーで円周上の人と全員の組合せの線が増減し、経路数 n(n−1)/2 を式つきで表示。増分（n−1 本）を強調し、リーダー経由の n−1 本と比較（props: n, max） |
 
 部品を追加したらこの表に追記してください。
 
