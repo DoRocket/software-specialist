@@ -249,4 +249,14 @@ function rich(text: string): string {
   .quiz-reset {
     margin-top: 8px;
   }
+  /* set:html で入れたコード表記にはスコープ付きの指定が届かないため :global を使う。
+     長い IPv6 アドレスなどがスマートフォンではみ出さないよう、途中でも折り返す */
+  .quiz :global(code) {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--bg-code);
+    padding: 1px 5px;
+    border-radius: 4px;
+    overflow-wrap: anywhere;
+  }
 </style>
