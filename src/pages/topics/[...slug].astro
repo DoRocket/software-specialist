@@ -5,6 +5,7 @@ import ExamBadges from '../../components/ExamBadges.astro';
 import TagList from '../../components/TagList.astro';
 import TopicCard from '../../components/TopicCard.astro';
 import CategoryIcon from '../../components/CategoryIcon.astro';
+import Quiz from '../../components/Quiz.astro';
 import { ancestry, getTopicTree, topicUrl, url, type TopicNode } from '../../lib/topics';
 
 export async function getStaticPaths() {
@@ -59,6 +60,8 @@ const next = tree.flat[index + 1];
     <div class="prose">
       <Content />
     </div>
+
+    <Quiz items={d.quiz} />
 
     {
       node.children.length > 0 && (
