@@ -5,6 +5,27 @@ summary: 基本情報・応用情報技術者試験の擬似言語の記述形�
 exams: [ip, fe, ap]
 tags: [プログラミング, アルゴリズム, 頻出]
 related: [basics/programming/recursion, basics/algorithms/searching, basics/algorithms/sorting, basics/logic]
+quiz:
+  - q: '整数型の変数 x に 6 が格納されているとき、次の選択処理を実行した後の y の値はどれか。`if (x mod 3 ＝ 0)` なら `y ← 1`、`elseif (x mod 2 ＝ 0)` なら `y ← 2`、`else` なら `y ← 3` とする。'
+    choices: ['1', '2', '3', '1 を代入した後に 2 を代入するので 2']
+    answer: 0
+    explanation: '条件式は上から順に評価され、最初に真になった条件の処理だけが実行される。$6 \bmod 3 = 0$ で 1 つ目の条件が真なので y ← 1 だけを実行し、elseif（6 は偶数）は評価されない。よって y は 1。'
+    level: fe
+  - q: 'x の初期値を 5 とする。処理A は `while (x ＞ 10)` 〜 `x ← x ＋ 4` 〜 `endwhile`、処理B は `do` 〜 `x ← x ＋ 4` 〜 `while (x ＞ 10)` である。それぞれを実行した後の x の値の組合せ（処理A、処理B）はどれか。'
+    choices: ['9 と 9', '5 と 5', '5 と 9', '9 と 13']
+    answer: 2
+    explanation: '処理A は前判定で、最初の判定 $5 > 10$ が偽なので一度も実行せず x = 5。処理B は後判定なので先に 1 回実行して x = 9、その後の判定 $9 > 10$ が偽で終了し x = 9。'
+    level: fe
+  - q: '論理型の変数が x = true、y = false、z = false のとき、式 `x or y and z` の値と、式 `(x or y) and z` の値の組合せはどれか。'
+    choices: ['true と true', 'true と false', 'false と true', 'false と false']
+    answer: 1
+    explanation: '`and` は `or` より優先されるので、`x or y and z` は `x or (y and z)` = true or false = true。`(x or y) and z` は括弧が先なので true and false = false。左から順に計算すると 1 つ目も false になり、エを選んでしまう。'
+    level: fe
+  - q: '配列 a = {7, 2, 9, 4, 6}（要素番号は 1 から始まる）について、s ← 0 とした後、i を 1 から a の要素数まで 1 ずつ増やしながら、`i mod 2 ＝ 1` のときだけ `s ← s ＋ a[i]` を実行する。終了後の s の値はどれか。'
+    choices: ['6', '28', '15', '22']
+    answer: 3
+    explanation: 'i が奇数（1, 3, 5）のときに加算するので、$a[1] + a[3] + a[5] = 7 + 9 + 6 = 22$。要素番号を 0 から始まると誤解して 2 番目・4 番目の要素を足すとアの $2 + 4 = 6$、全要素を足すとイの 28 になる。'
+    level: fe
 ---
 
 **擬似言語** は、特定のプログラム言語に依存せずにアルゴリズムを表すための、試験用の擬似的なプログラム言語です。

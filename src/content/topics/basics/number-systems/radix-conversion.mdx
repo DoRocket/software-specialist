@@ -5,6 +5,32 @@ summary: 2進数・8進数・10進数・16進数を相互に変換する方法�
 exams: [ip, fe, ap]
 tags: [数値表現, 計算問題, 頻出]
 related: [basics/number-systems/complement, basics/number-systems/floating-point, basics/logic]
+quiz:
+  - q: '10進数の 58 を 2進数で表したものはどれか。'
+    choices: ['110110', '111010', '101110', '111001']
+    answer: 1
+    explanation: '2 で割り続けると $58 \to 29$ 余り 0、$29 \to 14$ 余り 1、$14 \to 7$ 余り 0、$7 \to 3$ 余り 1、$3 \to 1$ 余り 1、$1 \to 0$ 余り 1。余りを下から読んで `111010`。検算: $32 + 16 + 8 + 2 = 58$。アは 54、ウは 46、エは 57 を表す。'
+    level: ip
+  - q: '2進数の $(110.101)_2$ を 10進数で表したものはどれか。'
+    choices: ['6.375', '6.5', '6.625', '12.625']
+    answer: 2
+    explanation: '各桁の数字 × 重みを合計する。$1 \times 4 + 1 \times 2 + 0 \times 1 + 1 \times 0.5 + 0 \times 0.25 + 1 \times 0.125 = 6.625$。小数第3位の重みは $2^{-3} = 0.125$ であり、これを落とすとイの 6.5 になる。'
+    level: fe
+  - q: '2進数の $(11011010)_2$ を 16進数で表したものはどれか。'
+    choices: ['AD', 'CA', 'DB', 'DA']
+    answer: 3
+    explanation: '4桁ずつ区切ると `1101` と `1010`。$1101 = 13 = \text{D}$、$1010 = 10 = \text{A}$ なので $(\text{DA})_{16}$。アは上位と下位を逆に読んだ場合の誤り。'
+    level: fe
+  - q: '次の 10進小数のうち、2進数で有限桁の小数として正確に表せるものはどれか。'
+    choices: ['0.2', '0.625', '0.4', '0.6']
+    answer: 1
+    explanation: '分母が 2 のべき乗の分数で表せる小数だけが有限桁になる。$0.625 = \dfrac{5}{8} = \dfrac{5}{2^3}$ なので $(0.101)_2$ と表せる。$0.2 = \dfrac{1}{5}$、$0.4 = \dfrac{2}{5}$、$0.6 = \dfrac{3}{5}$ は分母に 5 が残り、循環小数になる。'
+    level: fe
+  - q: '16進数の $(1\text{A}.8)_{16}$ を 10進数で表したものはどれか。'
+    choices: ['26.5', '26.8', '18.5', '24.5']
+    answer: 0
+    explanation: '整数部は $1 \times 16 + 10 \times 1 = 26$、小数部は $8 \times 16^{-1} = \dfrac{8}{16} = 0.5$ なので 26.5。小数部の 8 をそのまま 0.8 と読むとイの誤りになる。'
+    level: fe
 ---
 
 import BitToggle from '../../../../components/diagrams/BitToggle.astro';
