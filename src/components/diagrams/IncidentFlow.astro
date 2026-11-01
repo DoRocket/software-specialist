@@ -1,0 +1,227 @@
+---
+/**
+ * インシデント発生 → サービスデスクでの記録・分類・優先度付け → 一次対応 → エスカレーション（機能的 / 階層的）
+ * → 回避策での回復 → 終了 → 問題管理（根本原因分析・既知の誤り）→ 変更管理 の流れをステップ再生で見せる。
+ * 箱は HTML で組むので、スマートフォンでも文字が小さくなりすぎない。
+ *
+ * 使い方（.mdx）:
+ *   <IncidentFlow />
+ *   <IncidentFlow example="メールが送信できない" />
+ */
+import Figure from './Figure.astro';
+
+interface Props {
+  title?: string;
+  caption?: string;
+  /** 利用者からの連絡内容の例 */
+  example?: string;
+}
+const { title = 'インシデント管理から問題管理への流れ', caption, example = '販売管理システムにログインできない' } = Astro.props;
+
+interface Node {
+  step: number;
+  role: string;
+  /** 役割ごとの色（--dg-c1〜c5 の番号） */
+  color: 1 | 2 | 3 | 4 | 5;
+  name: string;
+  detail: string;
+}
+
+const user: Node = { step: 1, role: '利用者', color: 3, name: 'インシデントの発生・連絡', detail: `「${example}」とサービスデスクに連絡する` };
+const record: Node = { step: 2, role: 'サービスデスク', color: 1, name: '記録・分類・優先度付け', detail: '受付内容を記録し、影響度と緊急度から優先度を決める' };
+const first: Node = { step: 3, role: 'サービスデスク', color: 1, name: '一次対応', detail: 'FAQ・知識ベース・既知の誤りを照会する。ここでは解決できない' };
+const functional: Node = { step: 4, role: '専門チーム', color: 2, name: '機能的エスカレーション', detail: '技術的な知識を持つ二次サポートへ引き継ぐ' };
+const hierarchical: Node = { step: 5, role: '管理者', color: 4, name: '階層的エスカレーション', detail: '影響が大きく解決目標時間を超えそうなので、上位の管理者に報告する' };
+const recover: Node = { step: 6, role: '専門チーム', color: 2, name: '回避策でサービスを回復', detail: '待機系のサーバへ切り替えて、利用者が業務を再開できるようにする' };
+const close: Node = { step: 7, role: 'サービスデスク', color: 1, name: '利用者に確認して終了', detail: '回復を確認し、対応内容を記録してインシデントを終了する' };
+const rca: Node = { step: 8, role: '問題管理', color: 5, name: '根本原因の分析', detail: 'インシデントの記録や傾向を分析して原因を突き止め、既知の誤りとして記録する' };
+const rfc: Node = { step: 9, role: '変更管理', color: 5, name: '変更要求（RFC）で恒久対策', detail: '原因を取り除く修正を変更管理に依頼し、再発を防ぐ' };
+
+const narration = [
+  `利用者が「${example}」と気づき、サービスデスクに連絡します。サービスの計画外の中断はインシデントです。`,
+  'サービスデスクは単一の窓口（SPOC）として受け付け、記録・分類したうえで、影響度と緊急度から優先度を決めます。',
+  'サービスデスクが FAQ や既知の誤りを照会して解決を試みます。手に負えないので、次の担当に引き継ぎます。',
+  'より専門的な知識・権限を持つチームに引き継ぐのが機能的エスカレーションです。',
+  '影響が大きい、解決目標時間を超えそうなどの場合は、上位の管理者に報告して判断や資源の追加を求めます（階層的エスカレーション）。',
+  '原因の究明よりも回復を優先し、待機系への切替えなどの回避策（ワークアラウンド）で業務を再開します。',
+  'サービスデスクが利用者に回復を確認し、インシデントを終了（クローズ）します。インシデント管理はここまでです。',
+  '問題管理は、インシデントの根本原因を分析します。原因が分かったが恒久的な解決がまだの状態は「既知の誤り」として記録し、次の一次対応に生かします。',
+  '原因を取り除く修正は、変更要求（RFC）として変更管理で評価・承認し、リリースして再発を防ぎます。',
+];
+const steps = narration.length;
+
+---
+
+<Figure title={title} caption={caption} steps={steps} interval={3800} intro="利用者が障害に気づいてから、原因が取り除かれるまでの流れを順に見ていきます。">
+  <div class="if-flow">
+    <div class="if-phase if-phase-incident">
+      <p class="if-phase-label">インシデント管理<span>目的: サービスをできるだけ早く回復する</span></p>
+      {
+        [user, record, first].map((n) => (
+          <div class="if-node" data-step={n.step} style={`--c: var(--dg-c${n.color})`}>
+            <span class="if-role">{n.role}</span>
+            <span class="if-name">{n.name}</span>
+            <span class="if-detail">{n.detail}</span>
+          </div>
+        ))
+      }
+      <div class="if-split">
+        {
+          [functional, hierarchical].map((n) => (
+            <div class="if-node" data-step={n.step} style={`--c: var(--dg-c${n.color})`}>
+              <span class="if-role">{n.role}</span>
+              <span class="if-name">{n.name}</span>
+              <span class="if-detail">{n.detail}</span>
+            </div>
+          ))
+        }
+      </div>
+      {
+        [recover, close].map((n) => (
+          <div class="if-node" data-step={n.step} style={`--c: var(--dg-c${n.color})`}>
+            <span class="if-role">{n.role}</span>
+            <span class="if-name">{n.name}</span>
+            <span class="if-detail">{n.detail}</span>
+          </div>
+        ))
+      }
+    </div>
+    <div class="if-phase if-phase-problem">
+      <p class="if-phase-label">問題管理<span>目的: 根本原因を取り除き、再発を防ぐ</span></p>
+      {
+        [rca, rfc].map((n) => (
+          <div class="if-node" data-step={n.step} style={`--c: var(--dg-c${n.color})`}>
+            <span class="if-role">{n.role}</span>
+            <span class="if-name">{n.name}</span>
+            <span class="if-detail">{n.detail}</span>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+  <Fragment slot="narration">
+    {narration.map((t, i) => <p data-step-only={i + 1}>{t}</p>)}
+  </Fragment>
+</Figure>
+
+<style>
+  .if-flow {
+    display: grid;
+    gap: 14px;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  .if-phase {
+    display: grid;
+    gap: 22px;
+    padding: 10px 12px 14px;
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+  }
+  .if-phase-label {
+    margin: 0 0 -8px;
+    font-weight: 700;
+    font-size: 0.92rem;
+  }
+  .if-phase-label span {
+    display: block;
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+  .if-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .if-node {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border: 1.5px solid var(--dg-stroke);
+    border-left: 5px solid var(--c);
+    border-radius: 8px;
+    background: var(--dg-fill);
+    line-height: 1.45;
+    transition: opacity 0.45s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  /* 箱の間の下向き矢印（1 つ目の箱と、横並びの右の箱には付けない） */
+  .if-node::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -19px;
+    width: 0;
+    height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 9px solid var(--fg-muted);
+    transform: translateX(-50%);
+  }
+  .if-node::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -22px;
+    width: 2px;
+    height: 12px;
+    background: var(--fg-muted);
+    transform: translateX(-50%);
+  }
+  .if-phase > .if-node:first-of-type::before,
+  .if-phase > .if-node:first-of-type::after {
+    display: none;
+  }
+  .if-split > .if-node:last-child::before,
+  .if-split > .if-node:last-child::after {
+    display: none;
+  }
+  .if-node.is-current {
+    border-color: var(--accent);
+    border-left-color: var(--c);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  .if-role {
+    align-self: flex-start;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--c);
+    border: 1px solid var(--c);
+    background: var(--bg);
+  }
+  .if-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+  .if-detail {
+    font-size: 0.82rem;
+    color: var(--fg-muted);
+  }
+  .if-phase-problem {
+    border-color: color-mix(in srgb, var(--dg-c5) 55%, var(--border));
+  }
+  @media (max-width: 480px) {
+    .if-phase {
+      padding: 8px 8px 12px;
+    }
+    .if-node {
+      padding: 6px 8px;
+    }
+    .if-name {
+      font-size: 0.88rem;
+    }
+    /* 狭い画面では図を縦に短くするため補足を省く（同じ内容は説明文に出る） */
+    .if-detail {
+      display: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .if-node {
+      transition: none;
+    }
+  }
+</style>
