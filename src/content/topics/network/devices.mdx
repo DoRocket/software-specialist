@@ -7,6 +7,8 @@ tags: [頻出, 用語]
 related: [network/osi-tcpip, network/datalink/ethernet, network/ip/routing]
 ---
 
+import SwitchLearning from '../../../components/diagrams/SwitchLearning.astro';
+
 ネットワーク機器は「**どの層の情報を見て中継するか**」で整理すると理解しやすくなります。
 上位の層で動く機器ほど、より多くの情報を解釈して賢く中継できます。
 
@@ -32,6 +34,10 @@ related: [network/osi-tcpip, network/datalink/ethernet, network/ip/routing]
 - 宛先MACアドレスがテーブルにあればそのポートにだけ転送し、未学習の宛先やブロードキャストは全ポートに転送（フラッディング）します。
 - ポートごとにコリジョンドメインが分かれます。一方、ブロードキャストは全ポートに届くため **ブロードキャストドメインは分割されません**。
 - **VLAN** 機能を使うと、1台のスイッチを論理的に複数のネットワーク（ブロードキャストドメイン）に分割できます。
+
+4台の PC が順にフレームを送ったとき、MACアドレステーブルが埋まっていく様子を見てみましょう。
+
+<SwitchLearning />
 
 ### ルータ
 

@@ -7,6 +7,8 @@ tags: [頻出, プロトコル, 用語]
 related: [network/application/dhcp, network/transport/tcp-udp]
 ---
 
+import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.astro';
+
 **DNS（Domain Name System）** は、`www.example.com` のような **ドメイン名** と **IPアドレス** を対応付ける仕組みです。
 人間には覚えやすい名前を使い、機器同士は IPアドレスで通信できるようにします。名前から IPアドレスを求めることを **名前解決** といいます。
 
@@ -34,6 +36,27 @@ www . example . co . jp .
 4. `example.co.jp` の権威DNSサーバから IPアドレスを得て PC に返し、結果を **TTL** の間キャッシュする
 
 PC からフルサービスリゾルバへの「最終的な答えをください」という問合せを **再帰問合せ** と呼びます。
+
+この流れを、キャッシュに答えがない場合について順に見てみます。
+
+<SequenceDiagram
+  title="www.example.co.jp の名前解決"
+  intro="PC が www.example.co.jp の IPアドレスを知りたい。フルサービスリゾルバのキャッシュには、まだ答えがないものとします。"
+  actors={['PC', 'フルサービスリゾルバ', 'ルートサーバ', 'jp', 'co.jp', 'example.co.jp']}
+  colWidth={160}
+  messages={[
+    { from: 0, to: 1, label: '再帰問合せ', note: 'PC（スタブリゾルバ）が、設定されたフルサービスリゾルバに www.example.co.jp の IPアドレスを問い合わせる。「最終的な答えをください」という再帰問合せ。' },
+    { from: 1, to: 2, label: '問合せ', note: 'キャッシュに答えがないので、フルサービスリゾルバはまずルートサーバに問い合わせる。' },
+    { from: 2, to: 1, label: 'jp はこちら', dashed: true, note: 'ルートサーバは答えそのものではなく、jp を管理するサーバを教える。' },
+    { from: 1, to: 3, label: '問合せ', note: '教えてもらった jp のサーバに問い合わせる。' },
+    { from: 3, to: 1, label: 'co.jp はこちら', dashed: true, note: 'co.jp を管理するサーバを教えてもらう。' },
+    { from: 1, to: 4, label: '問合せ', note: 'co.jp のサーバに問い合わせる。' },
+    { from: 4, to: 1, label: 'example.co.jp はこちら', dashed: true, note: 'example.co.jp を管理する権威DNSサーバを教えてもらう。このように順にたどる問合せが反復問合せ。' },
+    { from: 1, to: 5, label: '問合せ', note: 'example.co.jp の権威DNSサーバに問い合わせる。' },
+    { from: 5, to: 1, label: 'IPアドレス', dashed: true, note: '権威DNSサーバが www.example.co.jp の IPアドレス（A レコード）を答える。' },
+    { from: 1, to: 0, label: 'IPアドレス', dashed: true, note: 'フルサービスリゾルバが PC に IPアドレスを返し、結果を TTL の間キャッシュする。次に同じ問合せが来たら、キャッシュから答えられる。' },
+  ]}
+/>
 
 ## 主なリソースレコード
 

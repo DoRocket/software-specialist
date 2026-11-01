@@ -14,6 +14,8 @@
  *   />
  * - from / to は actors の番号（0 始まり）。to に 'all' を指定するとブロードキャスト（送信元以外の全員宛て）。
  * - dashed: true で応答などを破線にする。
+ * - colWidth: 登場人物の間隔（既定 200）。ラベルが長いときは広げ、登場人物が多いときは狭める。
+ *   幅が 800 を超える図は、スマートフォンでは文字が小さくなりすぎないよう横スクロールにする。
  */
 import Figure from './Figure.astro';
 
@@ -31,16 +33,24 @@ interface Props {
   intro?: string;
   actors: string[];
   messages: Message[];
+  colWidth?: number;
 }
-const { title, caption, intro, actors, messages } = Astro.props;
+const { title, caption, intro, actors, messages, colWidth = 200 } = Astro.props;
 
-const colW = 200;
+const colW = colWidth;
 const margin = 90;
 const top = 56;
 const rowH = 58;
 const width = margin * 2 + colW * (actors.length - 1);
 const height = top + rowH * messages.length + 30;
 const x = (i: number) => margin + colW * i;
+// 幅の広い図は、狭い画面で縮小しすぎないよう最小幅を決めて横スクロールさせる
+// 登場人物の箱の幅: 既定 140。ラベルが長ければ、隣と重ならない範囲で広げる
+const boxW = (label: string) => {
+  const est = [...label].reduce((w, ch) => w + (ch.charCodeAt(0) > 0xff ? 14.5 : 8.5), 0) + 16;
+  return Math.max(140, Math.min(colW - 8, Math.ceil(est)));
+};
+const minWidth = width > 800 ? Math.round(width * 0.7) : 0;
 
 const arrows = messages.map((m, i) => {
   const y = top + rowH * (i + 0.75);
@@ -56,7 +66,8 @@ const arrows = messages.map((m, i) => {
 ---
 
 <Figure title={title} caption={caption} steps={messages.length} intro={intro}>
-  <svg class="seq" viewBox={`0 0 ${width} ${height}`} style={`max-width: ${Math.round(width * 1.5)}px; margin: 0 auto;`} role="img" aria-label={title ?? 'シーケンス図'}>
+  <div class="seq-scroll">
+  <svg class="seq" viewBox={`0 0 ${width} ${height}`} style={`max-width: ${Math.round(width * 1.5)}px;${minWidth ? ` min-width: ${minWidth}px;` : ''} margin: 0 auto;`} role="img" aria-label={title ?? 'シーケンス図'}>
     <defs>
       <marker id="seq-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
         <path d="M0,0 L10,5 L0,10 z" class="seq-arrowhead"></path>
@@ -66,7 +77,7 @@ const arrows = messages.map((m, i) => {
       actors.map((a, i) => (
         <g>
           <line class="seq-lifeline" x1={x(i)} y1={top} x2={x(i)} y2={height - 8} />
-          <rect class="seq-actor" x={x(i) - 70} y="8" width="140" height="36" rx="8" />
+          <rect class="seq-actor" x={x(i) - boxW(a) / 2} y="8" width={boxW(a)} height="36" rx="8" />
           <text class="seq-actor-label" x={x(i)} y="31" text-anchor="middle">
             {a}
           </text>
@@ -84,6 +95,7 @@ const arrows = messages.map((m, i) => {
               x2={l.x2}
               y2={a.y}
               marker-end="url(#seq-arrow)"
+              pathLength={a.dashed ? undefined : 590}
             />
           ))}
           <text class="seq-label" x={a.labelX} y={a.y - 9} text-anchor="middle">
@@ -97,6 +109,7 @@ const arrows = messages.map((m, i) => {
       ))
     }
   </svg>
+  </div>
   <Fragment slot="narration">
     {
       arrows.map((a) =>
@@ -112,3 +125,10 @@ const arrows = messages.map((m, i) => {
     }
   </Fragment>
 </Figure>
+
+<style>
+  /* 幅の広い図（min-width 付き）は狭い画面で横スクロールにする */
+  .seq-scroll {
+    overflow-x: auto;
+  }
+</style>

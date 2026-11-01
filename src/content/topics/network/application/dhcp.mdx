@@ -7,6 +7,8 @@ tags: [プロトコル, 用語]
 related: [network/application/dns, network/ip/ip-address]
 ---
 
+import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.astro';
+
 **DHCP（Dynamic Host Configuration Protocol）** は、ネットワークに接続した端末に対して、
 **IPアドレス** などの通信に必要な設定情報を自動的に割り当てるプロトコルです。
 利用者が手作業で設定する手間や、アドレスの重複などの設定ミスを防げます。
@@ -29,6 +31,19 @@ DHCP は **UDP** を使い、サーバは **67 番**、クライアントは **6
 | 2 | DHCP**O**FFER | サーバ → クライアント | 「このアドレスを使えます」と候補を提示 |
 | 3 | DHCP**R**EQUEST | クライアント → ブロードキャスト | 「このサーバのこのアドレスを使います」と要求 |
 | 4 | DHCP**A**CK | サーバ → クライアント | 割当ての確定（承認） |
+
+<SequenceDiagram
+  title="DHCP の割当ての流れ（DORA）"
+  intro="IPアドレスをまだ持たないクライアントが LAN につながりました。同じ LAN には DHCPサーバと、ほかの PC もいます。"
+  actors={['他のPC', 'クライアント', 'DHCPサーバ']}
+  colWidth={240}
+  messages={[
+    { from: 1, to: 'all', label: 'DHCPDISCOVER', note: 'クライアントが「DHCPサーバはいますか？」とブロードキャストで送る。同じ LAN の全員（他のPC も）が受け取るが、応えるのは DHCPサーバだけ。' },
+    { from: 2, to: 1, label: 'DHCPOFFER', note: 'DHCPサーバが「このアドレスを使えます」と候補を提示する。' },
+    { from: 1, to: 'all', label: 'DHCPREQUEST', note: 'クライアントが「このサーバのこのアドレスを使います」と要求する。ブロードキャストなので、OFFER を出した他の DHCPサーバがいれば、選ばれなかったことが伝わる。' },
+    { from: 2, to: 1, label: 'DHCPACK', note: 'DHCPサーバが割当てを確定（承認）する。クライアントはこのアドレスで通信を始められる。' },
+  ]}
+/>
 
 頭文字をとって **DORA** と覚えます。REQUEST をブロードキャストするのは、複数の DHCPサーバから OFFER を受け取った場合に、選ばなかったサーバにも結果を知らせるためです。
 

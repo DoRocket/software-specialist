@@ -7,6 +7,8 @@ tags: [プロトコル, 用語]
 related: [network/datalink/ethernet, network/ip/ip-address/ipv6]
 ---
 
+import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.astro';
+
 IP がパケットを届けるには、いくつかの補助的なプロトコルが必要です。代表が **ARP** と **ICMP** です。
 
 ## ARP（Address Resolution Protocol）
@@ -19,6 +21,17 @@ ARP は **IPアドレスから MACアドレスを求める** プロトコルで�
 1. PC-A が「IPアドレス 192.168.1.20 の機器の MACアドレスを教えて」という **ARP要求** を **ブロードキャスト** で送る
 2. 同じネットワーク内の全機器が受け取るが、該当する IPアドレスを持つ PC-B だけが自分の MACアドレスを入れた **ARP応答** を **ユニキャスト** で返す
 3. PC-A は結果を **ARPテーブル（ARPキャッシュ）** に一定時間保存し、以後の通信に使う
+
+<SequenceDiagram
+  title="ARP による MACアドレスの解決"
+  intro="PC-A が、同じネットワークにある PC-B（192.168.1.20）へ送りたいが、PC-B の MACアドレスを知らない。"
+  actors={['PC-C', 'PC-A', 'PC-B（.20）']}
+  messages={[
+    { from: 1, to: 'all', label: 'ARP要求', note: 'PC-A が「IPアドレス 192.168.1.20 の機器の MACアドレスを教えて」とブロードキャストで送る。同じネットワーク内の全機器（PC-B も PC-C も）が受け取る。' },
+    { from: 2, to: 1, label: 'ARP応答', dashed: true, note: '192.168.1.20 を持つ PC-B だけが、自分の MACアドレスを入れた ARP応答をユニキャストで PC-A に返す。PC-C は自分のアドレスではないので応答しない。' },
+    { from: 1, to: 2, label: 'データのフレーム', note: 'PC-A は結果を ARPテーブル（ARPキャッシュ）に一定時間保存し、その MACアドレスを宛先にしてフレームを送る。' },
+  ]}
+/>
 
 宛先が別のネットワークにある場合は、宛先そのものではなく **デフォルトゲートウェイ（ルータ）の MACアドレス** を ARP で求めて、ルータにフレームを渡します。
 

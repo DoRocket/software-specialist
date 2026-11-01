@@ -1,0 +1,291 @@
+---
+/**
+ * カプセル化（送信側でヘッダを付け、受信側で外す）をステップ再生で見せる図。
+ * TCP/IP モデルの 4 層で、アプリケーションデータに TCP → IP → Ethernet ヘッダ（と FCS）が付き、
+ * 物理層でビット列として相手に届き、受信側で下の層から順に外されていく様子を示す。
+ *
+ * 使い方（.mdx）:
+ *   <Encapsulation />
+ *   <Encapsulation title="…" caption="…" />
+ */
+import Figure from './Figure.astro';
+
+interface Props {
+  title?: string;
+  caption?: string;
+}
+const { title = 'カプセル化と非カプセル化', caption } = Astro.props;
+
+type Part = 'eth' | 'ip' | 'tcp' | 'data' | 'fcs';
+const partLabel: Record<Part, [string, string]> = {
+  eth: ['Ethernet', 'ヘッダ'],
+  ip: ['IP', 'ヘッダ'],
+  tcp: ['TCP', 'ヘッダ'],
+  data: ['データ', ''],
+  fcs: ['FCS', ''],
+};
+const slots: Part[] = ['eth', 'ip', 'tcp', 'data', 'fcs'];
+
+interface Row {
+  layer: string;
+  pdu: string;
+  parts: Part[];
+}
+// 上から アプリケーション層 → ネットワークインタフェース層
+const rows: Row[] = [
+  { layer: 'アプリケーション層', pdu: 'データ', parts: ['data'] },
+  { layer: 'トランスポート層', pdu: 'セグメント', parts: ['tcp', 'data'] },
+  { layer: 'インターネット層', pdu: 'パケット', parts: ['ip', 'tcp', 'data'] },
+  { layer: 'ネットワークインタフェース層', pdu: 'フレーム', parts: ['eth', 'ip', 'tcp', 'data', 'fcs'] },
+];
+// 各行に新しく付く（受信側では外される）部分
+const added: Part[][] = [[], ['tcp'], ['ip'], ['eth', 'fcs']];
+
+// 送信側: 行 i（i ≥ 1）がステップ i で現れる。ステップ 4 で物理層を伝送。
+// 受信側: フレーム（行 3）がステップ 5、パケット（行 2）が 6、セグメント（行 1）が 7、データ（行 0）が 8。
+const sendStep = (i: number) => (i === 0 ? undefined : i);
+const recvStep = (i: number) => 8 - i;
+// 受信側で「外す」印: 行 i のヘッダは、その 1 つ上の行が現れるステップで外される
+const removeStep = (i: number) => recvStep(i) + 1;
+---
+
+<Figure
+  title={title}
+  caption={caption}
+  steps={8}
+  intro="送信側のアプリケーションが送りたいデータを用意しました。ここから各層がヘッダを付けて下の層へ渡します（▶ 再生 / 次へ）。"
+>
+  <div class="enc">
+    <section class="enc-side" aria-label="送信側">
+      <h4 class="enc-side-title">送信側 <span class="enc-dir">（上の層から下へ：ヘッダを付ける）</span></h4>
+      {
+        rows.map((r, i) => (
+          <div class="enc-row" data-step={sendStep(i)}>
+            <div class="enc-layer">
+              <span class="enc-layer-name">{r.layer}</span>
+              <span class="enc-pdu">{r.pdu}</span>
+            </div>
+            <div class="enc-blocks">
+              {slots.map((s) =>
+                r.parts.includes(s) ? (
+                  <span class:list={['enc-part', `enc-${s}`, { 'enc-new': added[i].includes(s) }]}>
+                    <b>{partLabel[s][0]}</b>
+                    {partLabel[s][1] && <small>{partLabel[s][1]}</small>}
+                  </span>
+                ) : (
+                  <span class="enc-empty" />
+                ),
+              )}
+            </div>
+          </div>
+        ))
+      }
+    </section>
+
+    <div class="enc-wire" data-step="4">
+      <span class="enc-wire-label">物理層</span>
+      <span class="enc-bits dg-mono" aria-hidden="true">01101001 11000101 …</span>
+      <span class="enc-wire-text">ビット列（電気・光・電波の信号）として相手に届く</span>
+      <span class="enc-arrow" aria-hidden="true"></span>
+    </div>
+
+    <section class="enc-side" aria-label="受信側">
+      <h4 class="enc-side-title">受信側 <span class="enc-dir">（下の層から上へ：ヘッダを外す）</span></h4>
+      {
+        rows.map((r, i) => (
+          <div class="enc-row" data-step={recvStep(i)}>
+            <div class="enc-layer">
+              <span class="enc-layer-name">{r.layer}</span>
+              <span class="enc-pdu">{r.pdu}</span>
+            </div>
+            <div class="enc-blocks">
+              {slots.map((s) =>
+                r.parts.includes(s) ? (
+                  <span class:list={['enc-part', `enc-${s}`]}>
+                    <b>{partLabel[s][0]}</b>
+                    {partLabel[s][1] && <small>{partLabel[s][1]}</small>}
+                    {added[i].includes(s) && <span class="enc-off" data-step={removeStep(i)} aria-label="外す" />}
+                  </span>
+                ) : (
+                  <span class="enc-empty" />
+                ),
+              )}
+            </div>
+          </div>
+        ))
+      }
+    </section>
+  </div>
+
+  <Fragment slot="narration">
+    <p data-step-only="1"><strong>トランスポート層</strong>：TCP ヘッダ（ポート番号など）を付けて <strong>セグメント</strong> にする。</p>
+    <p data-step-only="2"><strong>インターネット層</strong>：IP ヘッダ（送信元・宛先の IPアドレスなど）を付けて <strong>パケット</strong> にする。</p>
+    <p data-step-only="3"><strong>ネットワークインタフェース層</strong>：Ethernet ヘッダ（MACアドレスなど）を先頭に、誤り検出用の FCS を末尾に付けて <strong>フレーム</strong> にする。</p>
+    <p data-step-only="4"><strong>物理層</strong>：フレームはビット列になり、電気・光・電波の信号として受信側へ伝わる。</p>
+    <p data-step-only="5">受信側のネットワークインタフェース層がフレームを受け取る。</p>
+    <p data-step-only="6">Ethernet ヘッダと FCS を外し、<strong>パケット</strong> をインターネット層へ渡す。</p>
+    <p data-step-only="7">IP ヘッダを外し、<strong>セグメント</strong> をトランスポート層へ渡す。</p>
+    <p data-step-only="8">TCP ヘッダを外し、元の <strong>データ</strong> がアプリケーションに届いた。</p>
+  </Fragment>
+</Figure>
+
+<style>
+  .enc {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      'send recv'
+      'wire wire';
+    gap: 10px 18px;
+    font-size: 0.85rem;
+  }
+  .enc-side:first-child {
+    grid-area: send;
+  }
+  .enc-side:last-child {
+    grid-area: recv;
+  }
+  .enc-wire {
+    grid-area: wire;
+  }
+  .enc-side-title {
+    margin: 0 0 6px;
+    font-size: 0.95rem;
+  }
+  .enc-dir {
+    font-weight: 400;
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+  }
+  .enc-row {
+    display: grid;
+    grid-template-columns: 8.4em 1fr;
+    align-items: center;
+    gap: 8px;
+    min-height: 3.1em;
+    padding: 4px 0;
+    border-top: 1px dashed var(--border);
+  }
+  .enc-layer {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+  }
+  .enc-layer-name {
+    font-size: 0.72rem;
+    color: var(--fg-muted);
+  }
+  .enc-pdu {
+    font-weight: 700;
+  }
+  .enc-blocks {
+    display: grid;
+    grid-template-columns: 1.3fr 0.9fr 0.9fr 1.05fr 0.85fr;
+    gap: 2px;
+    min-width: 0;
+  }
+  .enc-part,
+  .enc-empty {
+    min-width: 0;
+  }
+  .enc-part {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.6em;
+    padding: 1px 2px;
+    border: 1.5px solid var(--c);
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--c) 20%, var(--bg));
+    line-height: 1.15;
+    overflow: hidden;
+    text-align: center;
+  }
+  .enc-part b {
+    font-size: 0.74rem;
+  }
+  .enc-part small {
+    font-size: 0.62rem;
+    white-space: nowrap;
+    letter-spacing: -0.04em;
+    color: var(--fg-muted);
+  }
+  .enc-eth,
+  .enc-fcs {
+    --c: var(--dg-c3);
+  }
+  .enc-ip {
+    --c: var(--dg-c1);
+  }
+  .enc-tcp {
+    --c: var(--dg-c2);
+  }
+  .enc-data {
+    --c: var(--fg-muted);
+    background: var(--bg);
+  }
+  /* 送信側で今付いたヘッダを強調 */
+  .enc-row:global(.is-current) .enc-new {
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  /* 受信側で外すヘッダ: 斜線で消す */
+  .enc-off {
+    position: absolute;
+    inset: 0;
+    border-radius: 4px;
+    background: repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--bg) 55%, transparent) 0 4px,
+      color-mix(in srgb, var(--dg-warn) 45%, transparent) 4px 6px
+    );
+  }
+  .enc-wire {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    padding: 8px 12px;
+    border: 1.5px solid var(--dg-stroke);
+    border-radius: 8px;
+    background: var(--dg-fill);
+  }
+  .enc-wire-label {
+    font-weight: 700;
+  }
+  .enc-bits {
+    font-size: 0.8rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+  .enc-wire-text {
+    font-size: 0.8rem;
+  }
+  .enc-arrow {
+    margin-left: auto;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .enc-arrow::before {
+    content: '送信側 → 受信側';
+    font-size: 0.8rem;
+  }
+
+  @media (max-width: 720px) {
+    .enc {
+      grid-template-columns: 1fr;
+      grid-template-areas: 'send' 'wire' 'recv';
+    }
+    .enc-arrow::before {
+      content: '↓ 受信側へ';
+    }
+    .enc-row {
+      grid-template-columns: 7.4em 1fr;
+    }
+    .enc-layer-name {
+      font-size: 0.66rem;
+    }
+  }
+</style>
