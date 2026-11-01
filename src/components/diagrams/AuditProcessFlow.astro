@@ -1,0 +1,216 @@
+---
+/**
+ * システム監査の流れ（監査計画 → 予備調査 → 本調査 → 評価・結論 → 監査報告 → フォローアップ）を
+ * 縦に並べ、各段階で作られる成果物（監査計画書・監査調書・監査報告書など）と一緒にステップ再生で見せる。
+ * 予備調査〜評価・結論は「監査の実施」としてまとめて括弧で示す。
+ *
+ * 使い方（.mdx）:
+ *   <AuditProcessFlow />
+ */
+import Figure from './Figure.astro';
+import { range } from './steps';
+
+interface Props {
+  title?: string;
+  caption?: string;
+}
+const { title = 'システム監査の流れ', caption } = Astro.props;
+
+const boxX = 40;
+const boxW = 196;
+const boxH = 58;
+const gap = 30;
+const top = 14;
+const chipX = 262;
+const chipW = 168;
+const rowY = (i: number) => top + i * (boxH + gap);
+
+interface Phase {
+  name: string;
+  sub: string;
+  out: string[];
+  /** 成果物の欄を強調するステップ（既定はその段階のステップのみ） */
+  outOn?: string;
+  /** 成果物の欄を監査対象部門の作業として色分けする */
+  auditee?: boolean;
+}
+const phases: Phase[] = [
+  { name: '監査計画', sub: '目的・範囲・時期・体制', out: ['監査計画書'] },
+  { name: '予備調査', sub: '対象の実態を把握', out: ['本調査の監査手続を', '具体化'] },
+  { name: '本調査', sub: '監査技法で証拠を入手', out: ['監査証拠', '→ 監査調書に記録'], outOn: range(3, 4) },
+  { name: '評価・結論', sub: '証拠に基づいて判断', out: ['監査の結論', '（調書が根拠）'] },
+  { name: '監査報告', sub: '依頼者（経営者など）へ', out: ['監査報告書', '指摘事項・改善提案'] },
+  { name: 'フォローアップ', sub: '改善状況を確認', out: ['改善の実施は', '監査対象部門'], auditee: true },
+];
+const steps = phases.length;
+const height = rowY(phases.length - 1) + boxH + 14;
+
+const narration = [
+  'リスクの大きい領域に重点を置くよう（リスクアプローチ）、監査の目的・対象範囲・方法・時期・体制・スケジュールを決め、監査計画を立てます。',
+  '資料の閲覧やアンケート・ヒアリングで監査対象の実態を大まかにつかみ、本調査で実施する監査手続を具体的に決めます。',
+  'チェックリスト法・インタビュー法・突合・照合法などの監査技法で監査証拠を入手し、実施した手続と入手した証拠を監査調書に記録します。',
+  '十分かつ適切な監査証拠に基づいて、コントロールが適切かを評価し、監査の結論を形成します。結論に至った過程も監査調書に残します。',
+  '監査報告書を作成し、監査の依頼者に報告します。問題点は指摘事項とし、改善提案を記載します。',
+  '改善提案（または監査対象部門の改善計画）への対応が適切かつ適時に実施されているかを監査人が確認します。改善を実施するのは監査対象部門です。',
+];
+---
+
+<Figure title={title} caption={caption} steps={steps} interval={4200} intro="システム監査は、監査計画 → 監査の実施（予備調査・本調査・評価・結論）→ 監査報告 → フォローアップ の順に進みます。">
+  <svg class="apf" viewBox={`0 0 440 ${height}`} style="max-width: 560px; margin: 0 auto;" role="img" aria-label="システム監査の流れ。監査計画、予備調査、本調査、評価・結論、監査報告、フォローアップの順に進み、それぞれ監査計画書、監査手続の具体化、監査調書、監査の結論、監査報告書、改善状況の確認を行う">
+    <defs>
+      <marker id="apf-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" class="apf-arrowhead"></path>
+      </marker>
+    </defs>
+
+    <!-- 「監査の実施」の括弧（予備調査〜評価・結論） -->
+    <g class="apf-group" data-on-steps={range(2, 4)}>
+      <path d={`M24,${rowY(1) + 4} H16 V${rowY(3) + boxH - 4} H24`} />
+      <text transform={`translate(11 ${(rowY(1) + rowY(3) + boxH) / 2}) rotate(-90)`} text-anchor="middle" class="apf-group-label">監査の実施</text>
+    </g>
+
+    {
+      phases.map((p, i) => {
+        const y = rowY(i);
+        const cy = y + boxH / 2;
+        const outOn = p.outOn ?? String(i + 1);
+        return (
+          <g>
+            {i > 0 && (
+              <g data-step={i + 1}>
+                <line x1={boxX + boxW / 2} y1={y - gap + 2} x2={boxX + boxW / 2} y2={y - 3} class="apf-flow dg-draw" />
+              </g>
+            )}
+            <g class="apf-phase" data-on-steps={String(i + 1)}>
+              <rect x={boxX} y={y} width={boxW} height={boxH} rx="10" />
+              <text x={boxX + 14} y={cy - 4} class="apf-num">
+                {i + 1}
+              </text>
+              <text x={boxX + 34} y={cy - 4} class="apf-name">
+                {p.name}
+              </text>
+              <text x={boxX + 34} y={cy + 16} class="apf-sub">
+                {p.sub}
+              </text>
+            </g>
+            <g data-step={i + 1}>
+              <line x1={boxX + boxW + 2} y1={cy} x2={chipX - 4} y2={cy} class="apf-link dg-draw" />
+              <g class:list={['apf-out', { 'is-auditee': p.auditee }]} data-on-steps={outOn}>
+                <rect x={chipX} y={y + 4} width={chipW} height={boxH - 8} rx="6" />
+                {p.out.length === 1 ? (
+                  <text x={chipX + chipW / 2} y={cy + 5} text-anchor="middle" class="apf-out-main">
+                    {p.out[0]}
+                  </text>
+                ) : (
+                  <>
+                    <text x={chipX + chipW / 2} y={cy - 5} text-anchor="middle" class="apf-out-main">
+                      {p.out[0]}
+                    </text>
+                    <text x={chipX + chipW / 2} y={cy + 15} text-anchor="middle" class="apf-out-sub">
+                      {p.out[1]}
+                    </text>
+                  </>
+                )}
+              </g>
+            </g>
+          </g>
+        );
+      })
+    }
+  </svg>
+  <Fragment slot="narration">
+    {narration.map((n, i) => <p data-step-only={i + 1}>{n}</p>)}
+  </Fragment>
+</Figure>
+
+<script>
+  import '../../scripts/step-on';
+</script>
+
+<style>
+  .apf-arrowhead {
+    fill: var(--fg-muted);
+  }
+  .apf-flow {
+    stroke: var(--fg-muted);
+    stroke-width: 2;
+    marker-end: url(#apf-arrow);
+  }
+  .apf-link {
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 4;
+  }
+  .apf-phase rect {
+    fill: var(--dg-fill);
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+    transition: stroke 0.3s ease, fill 0.3s ease;
+  }
+  .apf-phase.is-on rect {
+    stroke: var(--accent);
+    stroke-width: 3;
+    fill: color-mix(in srgb, var(--accent) 14%, var(--dg-fill));
+  }
+  :global(.diagram-body) svg .apf-num {
+    font-weight: 700;
+    font-size: 15px;
+    fill: var(--fg-muted);
+  }
+  :global(.diagram-body) svg .is-on .apf-num {
+    fill: var(--accent);
+  }
+  :global(.diagram-body) svg .apf-name {
+    font-weight: 700;
+    font-size: 16px;
+  }
+  :global(.diagram-body) svg .apf-sub {
+    font-size: 13px;
+    fill: var(--fg-muted);
+  }
+  .apf-out rect {
+    fill: color-mix(in srgb, var(--dg-c2) 12%, var(--bg));
+    stroke: var(--dg-c2);
+    stroke-width: 1.5;
+    transition: stroke-width 0.3s ease;
+  }
+  .apf-out.is-on rect {
+    stroke-width: 3;
+  }
+  .apf-out.is-auditee rect {
+    fill: color-mix(in srgb, var(--dg-warn) 12%, var(--bg));
+    stroke: var(--dg-warn);
+  }
+  :global(.diagram-body) svg .apf-out-main {
+    font-weight: 700;
+    font-size: 14px;
+  }
+  :global(.diagram-body) svg .apf-out-sub {
+    font-size: 13px;
+  }
+  .apf-group path {
+    fill: none;
+    stroke: var(--fg-muted);
+    stroke-width: 1.5;
+    transition: stroke 0.3s ease;
+  }
+  .apf-group.is-on path {
+    stroke: var(--accent);
+    stroke-width: 2.5;
+  }
+  :global(.diagram-body) svg .apf-group-label {
+    font-size: 13px;
+    font-weight: 700;
+    fill: var(--fg-muted);
+  }
+  :global(.diagram-body) svg .apf-group.is-on .apf-group-label {
+    fill: var(--accent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .apf-phase rect,
+    .apf-out rect,
+    .apf-group path {
+      transition: none;
+    }
+  }
+</style>

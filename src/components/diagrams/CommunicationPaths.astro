@@ -1,0 +1,250 @@
+---
+/**
+ * コミュニケーション経路数の可視化。人数をスライダーで変えると、円周上に並んだメンバーと
+ * 全員の組合せの線（経路）が増減し、経路数 n(n−1)/2 を式つきで表示する。
+ * 最後に加わった人（n 人目）の経路を強調し、1人増えたときの増分（n−1 本）を示す。
+ *
+ * 使い方（.mdx）:
+ *   <CommunicationPaths n={5} max={12} />
+ * - n は初期の人数（2〜max）、max はスライダーの上限（既定 12、最大 20）
+ */
+import Figure from './Figure.astro';
+
+interface Props {
+  title?: string;
+  caption?: string;
+  n?: number;
+  max?: number;
+}
+const { title = 'コミュニケーション経路数', caption, n = 5, max: maxProp = 12 } = Astro.props;
+const max = Math.min(Math.max(maxProp, 3), 20);
+const initial = Math.min(Math.max(Math.round(n), 2), max);
+---
+
+<Figure title={title} caption={caption}>
+  <div class="cp" data-cp data-cp-max={max}>
+    <div class="dg-controls cp-controls">
+      <span class="cp-name">人数</span>
+      <button type="button" class="dg-btn" data-cp-step="-1" aria-label="1人減らす">−1</button>
+      <input type="range" min="2" max={max} step="1" value={initial} data-cp-in aria-label="人数" />
+      <button type="button" class="dg-btn" data-cp-step="1" aria-label="1人増やす">＋1</button>
+      <output class="dg-mono cp-n" data-cp-out>{initial}人</output>
+    </div>
+
+    <div class="cp-layout">
+      <svg viewBox="0 0 320 320" role="img" aria-label="メンバーと、メンバー間のコミュニケーション経路" data-cp-svg>
+        <g data-cp-lines></g>
+        <g data-cp-nodes></g>
+      </svg>
+
+      <div class="cp-side">
+        <div class="dg-result">
+          <div class="cp-label">経路数 ＝ n(n − 1) ÷ 2　… n 人から 2 人を選ぶ組合せの数</div>
+          <div class="dg-mono cp-formula" data-cp-formula></div>
+          <div class="cp-big"><span data-cp-total></span> 本</div>
+        </div>
+        <div class="dg-result">
+          <div class="cp-label"><span class="cp-swatch" aria-hidden="true"></span>強調した線: 最後に加わった人の経路</div>
+          <div class="dg-mono cp-formula" data-cp-diff></div>
+        </div>
+        <div class="dg-result">
+          <div class="cp-label">参考: 全員がリーダー（①）とだけやり取りする場合</div>
+          <div class="dg-mono cp-formula" data-cp-star></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</Figure>
+
+<script>
+  const NS = 'http://www.w3.org/2000/svg';
+  const circled = (i: number) => String.fromCodePoint(0x2460 + i - 1);
+  const paths = (n: number) => (n * (n - 1)) / 2;
+
+  function el(name: string, attrs: Record<string, string | number>) {
+    const e = document.createElementNS(NS, name);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+    return e;
+  }
+
+  function init(root: HTMLElement) {
+    const max = Number(root.dataset.cpMax);
+    const input = root.querySelector<HTMLInputElement>('[data-cp-in]')!;
+    const out = root.querySelector<HTMLElement>('[data-cp-out]')!;
+    const lines = root.querySelector<SVGGElement>('[data-cp-lines]')!;
+    const nodes = root.querySelector<SVGGElement>('[data-cp-nodes]')!;
+    const formula = root.querySelector<HTMLElement>('[data-cp-formula]')!;
+    const total = root.querySelector<HTMLElement>('[data-cp-total]')!;
+    const diff = root.querySelector<HTMLElement>('[data-cp-diff]')!;
+    const star = root.querySelector<HTMLElement>('[data-cp-star]')!;
+
+    const update = () => {
+      const n = Number(input.value);
+      out.textContent = `${n}人`;
+
+      // 円周上に配置（①を真上から時計回り）
+      const cx = 160;
+      const cy = 160;
+      const R = 124;
+      const pts = Array.from({ length: n }, (_, i) => {
+        const t = -Math.PI / 2 + (2 * Math.PI * i) / n;
+        return { x: cx + R * Math.cos(t), y: cy + R * Math.sin(t) };
+      });
+
+      lines.replaceChildren();
+      nodes.replaceChildren();
+      // 先に通常の線、あとから強調の線（上に重ねる）
+      for (const pass of [false, true]) {
+        for (let i = 0; i < n; i++) {
+          for (let j = i + 1; j < n; j++) {
+            const isNew = j === n - 1;
+            if (isNew !== pass) continue;
+            lines.append(
+              el('line', {
+                x1: pts[i].x.toFixed(1),
+                y1: pts[i].y.toFixed(1),
+                x2: pts[j].x.toFixed(1),
+                y2: pts[j].y.toFixed(1),
+                class: isNew ? 'cp-line is-new' : 'cp-line',
+              }),
+            );
+          }
+        }
+      }
+      const r = n > 14 ? 12 : 15;
+      pts.forEach((p, i) => {
+        const g = el('g', { class: i === n - 1 ? 'cp-node is-new' : 'cp-node' });
+        g.append(el('circle', { cx: p.x.toFixed(1), cy: p.y.toFixed(1), r }));
+        const t = el('text', { x: p.x.toFixed(1), y: (p.y + 5).toFixed(1), 'text-anchor': 'middle' });
+        t.textContent = circled(i + 1);
+        g.append(t);
+        nodes.append(g);
+      });
+
+      const p = paths(n);
+      formula.textContent = `${n} × (${n} − 1) ÷ 2 = ${n} × ${n - 1} ÷ 2 = ${p}`;
+      total.textContent = String(p);
+      diff.textContent =
+        n === 2
+          ? `1人のときは 0 本 → 2人で 1 本`
+          : `${n - 1}人のときは ${paths(n - 1)} 本 → ${n}人目が加わって ＋${n - 1} 本（${n}人目と既存の ${n - 1}人を結ぶ線）`;
+      star.textContent = `${n} − 1 = ${n - 1} 本（全員で話し合う場合の ${p} 本より少ない）`;
+
+      for (const b of root.querySelectorAll<HTMLButtonElement>('[data-cp-step]')) {
+        const s = Number(b.dataset.cpStep);
+        b.disabled = (s < 0 && n <= 2) || (s > 0 && n >= max);
+      }
+    };
+
+    input.addEventListener('input', update);
+    for (const b of root.querySelectorAll<HTMLButtonElement>('[data-cp-step]')) {
+      b.addEventListener('click', () => {
+        input.value = String(Math.min(max, Math.max(2, Number(input.value) + Number(b.dataset.cpStep))));
+        update();
+      });
+    }
+    update();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-cp]').forEach(init);
+</script>
+
+<style>
+  .cp-name {
+    font-weight: 700;
+  }
+  .cp-controls {
+    gap: 8px 10px;
+    flex-wrap: nowrap;
+  }
+  .cp-controls > :not(input) {
+    flex: none;
+    white-space: nowrap;
+  }
+  .cp-controls input[type='range'] {
+    flex: 0 1 180px;
+    width: 180px;
+    min-width: 60px;
+    padding: 0;
+    border: none;
+    background: none;
+    accent-color: var(--accent);
+  }
+  .cp-controls button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .cp-n {
+    min-width: 3em;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+  .cp-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+    gap: 12px 18px;
+    align-items: center;
+  }
+  @media (max-width: 640px) {
+    .cp-layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .cp-layout svg {
+      max-width: 320px;
+      margin: 0 auto;
+    }
+  }
+  .cp-side {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+  }
+  .cp-label {
+    font-size: 0.82rem;
+    color: var(--fg-muted);
+  }
+  .cp-formula {
+    margin-top: 2px;
+    font-size: 0.92rem;
+    overflow-wrap: anywhere;
+  }
+  .cp-big {
+    margin-top: 4px;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+  .cp-big span {
+    font-size: 1.6rem;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .cp-swatch {
+    display: inline-block;
+    width: 18px;
+    height: 0;
+    margin-right: 6px;
+    vertical-align: middle;
+    border-top: 3px solid var(--dg-c3);
+  }
+  .cp :global(svg .cp-line) {
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+  }
+  .cp :global(svg .cp-line.is-new) {
+    stroke: var(--dg-c3);
+    stroke-width: 2.5;
+  }
+  .cp :global(svg .cp-node circle) {
+    fill: var(--dg-fill);
+    stroke: var(--accent);
+    stroke-width: 1.5;
+  }
+  .cp :global(svg .cp-node.is-new circle) {
+    stroke: var(--dg-c3);
+    stroke-width: 2.5;
+  }
+  .cp :global(svg .cp-node text) {
+    font-size: 15px;
+    font-weight: 700;
+  }
+</style>
