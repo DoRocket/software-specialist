@@ -1,0 +1,297 @@
+---
+/**
+ * アローダイアグラム（PERT 図）。結合点ごとに最早結合点時刻を前から順に求め、
+ * 最遅結合点時刻を後ろから求めたあと、クリティカルパスを強調するステップ再生。
+ * 最早・最遅時刻とクリティカルパスは props の作業データから計算する（記事の数値と必ず一致する）。
+ *
+ * 使い方（.mdx）:
+ *   <ArrowDiagram
+ *     nodes={[{ id: 1, x: 40, y: 150 }, { id: 2, x: 200, y: 60 }, …]}
+ *     activities={[{ name: 'A', from: 1, to: 2, days: 3 }, …]}
+ *   />
+ * - nodes の x, y は viewBox（幅 width、高さ height）上の座標。結合点番号は ①② のように表示する
+ * - dummy: true の作業はダミー作業（点線、所要日数 0）
+ * - unit で日数の単位（既定: 日）
+ * - note は最後（クリティカルパス）のステップの説明に付け足す文
+ */
+import Figure from './Figure.astro';
+
+interface Node {
+  id: number;
+  x: number;
+  y: number;
+}
+interface Activity {
+  name: string;
+  from: number;
+  to: number;
+  days: number;
+  dummy?: boolean;
+}
+interface Props {
+  title?: string;
+  caption?: string;
+  nodes: Node[];
+  activities: Activity[];
+  width?: number;
+  height?: number;
+  unit?: string;
+  note?: string;
+}
+const { title = 'クリティカルパスを求める', caption, nodes, activities, width = 520, height = 300, unit = '日', note } = Astro.props;
+
+const circled = (n: number) => (n >= 1 && n <= 20 ? String.fromCodePoint(0x2460 + n - 1) : `(${n})`);
+const byId = new Map(nodes.map((n) => [n.id, n]));
+const dur = (a: Activity) => (a.dummy ? 0 : a.days);
+
+// トポロジカル順（入ってくる作業がすべて処理済みの結合点から）
+const order: number[] = [];
+{
+  const indeg = new Map(nodes.map((n) => [n.id, 0]));
+  for (const a of activities) indeg.set(a.to, (indeg.get(a.to) ?? 0) + 1);
+  const queue = nodes.filter((n) => indeg.get(n.id) === 0).map((n) => n.id);
+  while (queue.length) {
+    const id = queue.shift()!;
+    order.push(id);
+    for (const a of activities.filter((a) => a.from === id)) {
+      indeg.set(a.to, indeg.get(a.to)! - 1);
+      if (indeg.get(a.to) === 0) queue.push(a.to);
+    }
+  }
+}
+
+// 最早結合点時刻（前から、合流点では最大値）
+const es = new Map<number, number>();
+const esText = new Map<number, string>();
+for (const id of order) {
+  const ins = activities.filter((a) => a.to === id);
+  if (!ins.length) {
+    es.set(id, 0);
+    esText.set(id, `${circled(id)} は開始点なので 0`);
+    continue;
+  }
+  const cands = ins.map((a) => es.get(a.from)! + dur(a));
+  const v = Math.max(...cands);
+  es.set(id, v);
+  const terms = ins.map((a) => `${circled(a.from)}の${es.get(a.from)} + ${a.name}(${dur(a)})`);
+  esText.set(id, ins.length === 1 ? `${circled(id)} = ${terms[0]} = ${v}` : `${circled(id)} = max(${terms.join(', ')}) = max(${cands.join(', ')}) = ${v}`);
+}
+// 最遅結合点時刻（後ろから、分岐点では最小値）
+const ls = new Map<number, number>();
+for (const id of [...order].reverse()) {
+  const outs = activities.filter((a) => a.from === id);
+  ls.set(id, outs.length ? Math.min(...outs.map((a) => ls.get(a.to)! - dur(a))) : es.get(id)!);
+}
+const total = Math.max(...es.values());
+const isCritical = (a: Activity) => es.get(a.from) === ls.get(a.from) && es.get(a.to) === ls.get(a.to) && es.get(a.from)! + dur(a) === es.get(a.to);
+const criticalNames = order
+  .flatMap((id) => activities.filter((a) => a.from === id && isCritical(a) && !a.dummy))
+  .map((a) => a.name);
+
+const r = 18;
+const edges = activities.map((a) => {
+  const p = byId.get(a.from)!;
+  const q = byId.get(a.to)!;
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  const len = Math.hypot(dx, dy);
+  const ux = dx / len;
+  const uy = dy / len;
+  // ラベルは線の中点から、線に垂直な方向（上側）にずらす
+  let nx = uy;
+  let ny = -ux;
+  if (ny > 0) {
+    nx = -nx;
+    ny = -ny;
+  }
+  return {
+    ...a,
+    x1: p.x + ux * r,
+    y1: p.y + uy * r,
+    x2: q.x - ux * (r + 4),
+    y2: q.y - uy * (r + 4),
+    lx: (p.x + q.x) / 2 + nx * 14,
+    ly: (p.y + q.y) / 2 + ny * 14 + 5,
+    critical: isCritical(a),
+  };
+});
+
+// ステップ: 結合点ごとに最早時刻 → 最遅時刻（まとめて）→ クリティカルパス
+const esStep = new Map(order.map((id, i) => [id, i + 1]));
+const lsStepNo = order.length + 1;
+const cpStepNo = order.length + 2;
+const steps = cpStepNo;
+---
+
+<Figure title={title} caption={caption} steps={steps} intro="矢印が作業（括弧内は所要日数）、丸が結合点です。開始点から順に、各結合点の最早結合点時刻を求めていきます。">
+  <svg class="ad" viewBox={`0 0 ${width} ${height}`} style={`max-width: ${Math.round(width * 1.35)}px; margin: 0 auto;`} role="img" aria-label={title}>
+    <defs>
+      <marker id="ad-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" class="ad-arrowhead"></path>
+      </marker>
+      <marker id="ad-arrow-cp" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" class="ad-arrowhead-cp"></path>
+      </marker>
+    </defs>
+
+    <!-- 作業（矢印） -->
+    {
+      edges.map((e) => (
+        <g class:list={['ad-edge', { 'is-dummy': e.dummy }]}>
+          <line x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} />
+          <text x={e.lx} y={e.ly} text-anchor="middle" class="ad-edge-label">
+            {e.dummy ? 'ダミー' : `${e.name}(${e.days})`}
+          </text>
+        </g>
+      ))
+    }
+    <!-- 最早時刻を求めるときに使う「入ってくる作業」の強調 -->
+    {
+      order.map((id) => (
+        <g data-step-only={esStep.get(id)} class="ad-incoming">
+          {edges
+            .filter((e) => e.to === id)
+            .map((e) => (
+              <line x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} />
+            ))}
+        </g>
+      ))
+    }
+    <!-- クリティカルパス -->
+    <g data-step={cpStepNo} class="ad-cp">
+      {edges.filter((e) => e.critical).map((e) => <line class="dg-draw" x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} />)}
+    </g>
+
+    <!-- 結合点 -->
+    {
+      nodes.map((n) => (
+        <g class:list={['ad-node', { 'is-critical': es.get(n.id) === ls.get(n.id) }]}>
+          <g data-step={cpStepNo} class="ad-node-cp">
+            <circle cx={n.x} cy={n.y} r={r + 4} />
+          </g>
+          <circle cx={n.x} cy={n.y} r={r} class="ad-node-circle" />
+          <text x={n.x} y={n.y + 6} text-anchor="middle" class="ad-node-label">
+            {n.id}
+          </text>
+          <g data-step={esStep.get(n.id)} class="ad-es">
+            <rect x={n.x - 22} y={n.y - r - 32} width="44" height="24" rx="5" />
+            <text x={n.x} y={n.y - r - 14} text-anchor="middle">
+              {es.get(n.id)}
+            </text>
+          </g>
+          <g data-step={lsStepNo} class="ad-ls">
+            <rect x={n.x - 22} y={n.y + r + 8} width="44" height="24" rx="5" />
+            <text x={n.x} y={n.y + r + 26} text-anchor="middle">
+              {ls.get(n.id)}
+            </text>
+          </g>
+        </g>
+      ))
+    }
+
+    <!-- 凡例 -->
+    <g class="ad-legend" transform={`translate(8 ${height - 14})`}>
+      <rect x="0" y="-14" width="22" height="18" rx="4" class="ad-legend-es" />
+      <text x="28" y="0">最早結合点時刻</text>
+      <rect x="140" y="-14" width="22" height="18" rx="4" class="ad-legend-ls" />
+      <text x="168" y="0">最遅結合点時刻</text>
+    </g>
+  </svg>
+  <Fragment slot="narration">
+    {
+      order.map((id) => (
+        <p data-step-only={esStep.get(id)}>
+          <strong>最早結合点時刻</strong>：{esText.get(id)}
+          {activities.filter((a) => a.to === id).length > 1 && '（合流点では大きいほう）'}
+        </p>
+      ))
+    }
+    <p data-step-only={lsStepNo}>
+      <strong>最遅結合点時刻</strong>：終了点の {total} から後ろへ、所要日数を引いていきます（分岐点では小さいほう）。
+      {[...order].reverse().map((id) => `${circled(id)}=${ls.get(id)}`).join('、')}
+    </p>
+    <p data-step-only={cpStepNo}>
+      最早と最遅が一致する結合点を結ぶ経路 <strong>{criticalNames.join('→')}</strong> がクリティカルパスで、最短所要日数は <strong>{total}{unit}</strong> です。{note}
+    </p>
+  </Fragment>
+</Figure>
+
+<style>
+  .ad-arrowhead {
+    fill: var(--fg-muted);
+  }
+  .ad-arrowhead-cp {
+    fill: var(--dg-warn);
+  }
+  .ad-edge line {
+    stroke: var(--fg-muted);
+    stroke-width: 2;
+    marker-end: url(#ad-arrow);
+  }
+  .ad-edge.is-dummy line {
+    stroke-dasharray: 5 4;
+  }
+  :global(.diagram-body) svg .ad-edge-label {
+    font-size: 15px;
+    font-weight: 700;
+    paint-order: stroke;
+    stroke: var(--bg-subtle);
+    stroke-width: 5px;
+    stroke-linejoin: round;
+  }
+  .ad-incoming line {
+    stroke: var(--accent);
+    stroke-width: 4;
+    stroke-linecap: round;
+    opacity: 0.55;
+  }
+  .ad-cp line {
+    stroke: var(--dg-warn);
+    stroke-width: 5;
+    stroke-linecap: round;
+    marker-end: url(#ad-arrow-cp);
+    opacity: 0.8;
+  }
+  .ad-node-circle {
+    fill: var(--bg);
+    stroke: var(--dg-stroke);
+    stroke-width: 2;
+  }
+  :global(.diagram-body) svg .ad-node-label {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .ad-node-cp circle {
+    fill: none;
+    stroke: none;
+  }
+  .ad-node.is-critical .ad-node-cp circle {
+    stroke: var(--dg-warn);
+    stroke-width: 3;
+  }
+  .ad-es rect,
+  .ad-legend-es {
+    fill: color-mix(in srgb, var(--accent) 16%, var(--bg));
+    stroke: var(--accent);
+    stroke-width: 1.5;
+  }
+  .ad-ls rect,
+  .ad-legend-ls {
+    fill: color-mix(in srgb, var(--dg-c2) 16%, var(--bg));
+    stroke: var(--dg-c2);
+    stroke-width: 1.5;
+  }
+  :global(.diagram-body) svg .ad-es text,
+  :global(.diagram-body) svg .ad-ls text {
+    font-size: 15px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .ad-es.is-current rect {
+    stroke-width: 3;
+  }
+  :global(.diagram-body) svg .ad-legend text {
+    font-size: 13px;
+    fill: var(--fg-muted);
+  }
+</style>

@@ -1,0 +1,55 @@
+---
+/**
+ * SVG の中に置く「人」の絵。(x, y) は人の中心（頭と胴の間あたり）。高さ約 50。
+ * muted: 第三者など目立たせない人。label / sub を下に表示する。
+ */
+interface Props {
+  x: number;
+  y: number;
+  label?: string;
+  sub?: string;
+  muted?: boolean;
+  class?: string;
+}
+const { x, y, label, sub, muted = false, class: cls } = Astro.props;
+---
+
+<g class:list={['dg-person', { 'is-muted': muted }, cls]} transform={`translate(${x} ${y})`}>
+  <circle cx="0" cy="-12" r="11" class="dg-person-shape" />
+  <path d="M-19,22 Q-19,3 0,3 Q19,3 19,22 Z" class="dg-person-shape" />
+  {
+    label && (
+      <text x="0" y="42" text-anchor="middle" class="dg-person-label">
+        {label}
+      </text>
+    )
+  }
+  {
+    sub && (
+      <text x="0" y="59" text-anchor="middle" class="dg-person-sub">
+        {sub}
+      </text>
+    )
+  }
+</g>
+
+<style>
+  .dg-person-shape {
+    fill: color-mix(in srgb, var(--accent) 22%, var(--dg-fill));
+    stroke: var(--accent);
+    stroke-width: 1.5;
+  }
+  .is-muted .dg-person-shape {
+    fill: var(--dg-fill);
+    stroke: var(--fg-muted);
+    stroke-dasharray: 3 3;
+  }
+  :global(.diagram-body) svg .dg-person-label {
+    font-size: 14px;
+    font-weight: 700;
+  }
+  :global(.diagram-body) svg .dg-person-sub {
+    font-size: 13px;
+    fill: var(--fg-muted);
+  }
+</style>

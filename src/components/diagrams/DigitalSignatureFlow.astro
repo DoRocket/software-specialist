@@ -1,0 +1,283 @@
+---
+/**
+ * デジタル署名の生成と検証の流れ（ステップ再生）。
+ *   送信者 A: メッセージ → ハッシュ値 → A の秘密鍵で署名 → メッセージと署名を送る
+ *   受信者 B: 署名を A の公開鍵で復号 → ハッシュ値①、受信メッセージ → ハッシュ値② → 比較
+ * 最後のステップで「改ざんされていたら②が変わって一致しない」ことを示す。
+ *
+ * 使い方（.mdx）:
+ *   <DigitalSignatureFlow />
+ */
+import Figure from './Figure.astro';
+import KeyIcon from './parts/KeyIcon.astro';
+import DocIcon from './parts/DocIcon.astro';
+import { range } from './steps';
+
+interface Props {
+  title?: string;
+  caption?: string;
+}
+const { title = 'デジタル署名の生成と検証', caption } = Astro.props;
+
+const PUB = 'var(--dg-c2)';
+const PRIV = 'var(--dg-c4)';
+const HASH = '7f3a…c21e';
+const HASH_BAD = 'c90e…41b7';
+
+const sx = 72; // 送信者の列
+const mx = 272; // 受信者: メッセージの列
+const gx = 432; // 受信者: 署名の列
+const pillW = 136;
+
+const narration = [
+  '送信者 A は、送るメッセージからハッシュ関数でハッシュ値を求めます。',
+  'そのハッシュ値を A の秘密鍵で暗号化（署名処理）して、デジタル署名を作ります。',
+  'メッセージとデジタル署名を一緒に受信者 B へ送ります。',
+  'B は、受け取ったデジタル署名を A の公開鍵で復号（検証処理）し、ハッシュ値①を得ます。',
+  'B は、受け取ったメッセージから同じハッシュ関数でハッシュ値②を求めます。',
+  '①と②が一致したので検証成功です。送信者が A 本人であること、メッセージが改ざんされていないことがわかります。',
+  'もし途中でメッセージが改ざんされていたら、ハッシュ値②が変わって①と一致せず、検証は失敗します。',
+];
+---
+
+<Figure title={title} caption={caption} steps={narration.length} intro="送信者 A がメッセージにデジタル署名を付けて送り、受信者 B がそれを検証する流れです。">
+  <svg class="ds" viewBox="0 0 512 410" style="max-width: 680px; margin: 0 auto;" role="img" aria-label={title}>
+    <defs>
+      <marker id="ds-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" class="ds-arrowhead"></path>
+      </marker>
+    </defs>
+
+    <text class="ds-head" x={sx} y="20" text-anchor="middle">送信者 A</text>
+    <text class="ds-head" x={(mx + gx) / 2} y="20" text-anchor="middle">受信者 B</text>
+    <line class="ds-divider" x1="172" y1="8" x2="172" y2="402" />
+
+    <!-- ===== 送信者 ===== -->
+    <DocIcon x={sx} y={74} label="メッセージ" />
+
+    <g data-step="1">
+      <line class="ds-flow" x1={sx} y1="132" x2={sx} y2="152" />
+      <rect class="ds-pill" x={sx - pillW / 2} y="156" width={pillW} height="34" rx="17" />
+      <text class="ds-pill-text" x={sx} y="178" text-anchor="middle">ハッシュ関数</text>
+      <line class="ds-flow" x1={sx} y1="190" x2={sx} y2="206" />
+      <rect class="ds-chip" x={sx - pillW / 2} y="210" width={pillW} height="30" rx="6" />
+      <text class="ds-chip-text" x={sx} y="230" text-anchor="middle">{HASH}</text>
+      <text class="ds-mini" x={sx + 8} y="204">ハッシュ値</text>
+    </g>
+
+    <g data-step="2">
+      <line class="ds-flow" x1={sx} y1="240" x2={sx} y2="256" />
+      <rect class="ds-pill ds-pill-key" x={sx - pillW / 2} y="260" width={pillW} height="46" rx="12" style={`--key: ${PRIV};`} />
+      <g transform={`translate(${sx - pillW / 2 + 8} 274) scale(0.62)`}>
+        <KeyIcon x={0} y={0} color={PRIV} />
+      </g>
+      <text class="ds-pill-text" x={sx + 18} y="279" text-anchor="middle">A の秘密鍵</text>
+      <text class="ds-pill-text" x={sx + 18} y="298" text-anchor="middle">で署名</text>
+      <line class="ds-flow" x1={sx} y1="306" x2={sx} y2="324" />
+    </g>
+    <g class="ds-show" data-on-steps={range(2, 2)}>
+      <g transform={`translate(${sx} 352)`}>
+        <g class="ds-sig">
+          <rect x="-38" y="-22" width="76" height="44" rx="6" />
+          <path d="M-28,4 q6,-14 12,0 t12,0 t12,-2" class="ds-sig-pen" />
+          <circle cx="22" cy="8" r="8" style={`fill: ${PRIV};`} />
+        </g>
+        <text class="ds-label" y="40" text-anchor="middle">デジタル署名</text>
+      </g>
+    </g>
+
+    <!-- ===== 送信: メッセージと署名が B へ ===== -->
+    <g class="ds-show ds-move" data-on-steps={range(3, 6)} style={`--fx: ${sx - mx}px; --fy: 0px;`}>
+      <DocIcon x={mx} y={74} label="メッセージ" />
+    </g>
+    <g class="ds-show" data-on-steps="7">
+      <DocIcon x={mx} y={74} label="メッセージ" />
+      <g transform={`translate(${mx + 26} 50)`}>
+        <rect x="-4" y="-14" width="48" height="22" rx="11" class="ds-bad-badge" />
+        <text x="20" y="2" text-anchor="middle" class="ds-bad-text">改ざん</text>
+      </g>
+    </g>
+    <g class="ds-show ds-move" data-on-steps={range(3, 7)} style={`--fx: ${sx - gx}px; --fy: ${352 - 74}px;`}>
+      <g transform={`translate(${gx} 74)`}>
+        <g class="ds-sig">
+          <rect x="-38" y="-22" width="76" height="44" rx="6" />
+          <path d="M-28,4 q6,-14 12,0 t12,0 t12,-2" class="ds-sig-pen" />
+          <circle cx="22" cy="8" r="8" style={`fill: ${PRIV};`} />
+        </g>
+        <text class="ds-label" y="40" text-anchor="middle">デジタル署名</text>
+      </g>
+    </g>
+
+    <!-- ===== 受信者: 署名を A の公開鍵で復号 → ① ===== -->
+    <g data-step="4">
+      <line class="ds-flow" x1={gx} y1="122" x2={gx} y2="152" />
+      <rect class="ds-pill ds-pill-key" x={gx - pillW / 2} y="156" width={pillW} height="46" rx="12" style={`--key: ${PUB};`} />
+      <g transform={`translate(${gx - pillW / 2 + 8} 170) scale(0.62)`}>
+        <KeyIcon x={0} y={0} color={PUB} />
+      </g>
+      <text class="ds-pill-text" x={gx + 18} y="175" text-anchor="middle">A の公開鍵</text>
+      <text class="ds-pill-text" x={gx + 18} y="194" text-anchor="middle">で復号</text>
+      <line class="ds-flow" x1={gx} y1="202" x2={gx} y2="218" />
+      <rect class="ds-chip" x={gx - pillW / 2} y="222" width={pillW} height="30" rx="6" />
+      <text class="ds-chip-text" x={gx} y="242" text-anchor="middle">① {HASH}</text>
+    </g>
+
+    <!-- ===== 受信者: 受信メッセージ → ② ===== -->
+    <g data-step="5">
+      <line class="ds-flow" x1={mx} y1="132" x2={mx} y2="162" />
+      <rect class="ds-pill" x={mx - pillW / 2} y="166" width={pillW} height="34" rx="17" />
+      <text class="ds-pill-text" x={mx} y="188" text-anchor="middle">ハッシュ関数</text>
+      <line class="ds-flow" x1={mx} y1="200" x2={mx} y2="218" />
+      <rect class="ds-chip" x={mx - pillW / 2} y="222" width={pillW} height="30" rx="6" />
+    </g>
+    <text class="ds-chip-text ds-show" data-on-steps={range(5, 6)} x={mx} y="242" text-anchor="middle">② {HASH}</text>
+    <text class="ds-chip-text ds-chip-bad ds-show" data-on-steps="7" x={mx} y="242" text-anchor="middle">② {HASH_BAD}</text>
+
+    <!-- ===== 比較 ===== -->
+    <g data-step="6">
+      <path class="ds-flow" d={`M${mx},252 L${mx},268 L${(mx + gx) / 2 - 30},286`} />
+      <path class="ds-flow" d={`M${gx},252 L${gx},268 L${(mx + gx) / 2 + 30},286`} />
+      <rect class="ds-pill" x={(mx + gx) / 2 - 50} y="286" width="100" height="32" rx="16" />
+      <text class="ds-pill-text" x={(mx + gx) / 2} y="307" text-anchor="middle">① と ② を比較</text>
+      <line class="ds-flow" x1={(mx + gx) / 2} y1="318" x2={(mx + gx) / 2} y2="334" />
+    </g>
+    <g class="ds-show" data-on-steps="6">
+      <rect class="ds-result ds-ok" x={(mx + gx) / 2 - 110} y="338" width="220" height="36" rx="8" />
+      <text class="ds-result-text ds-ok-text" x={(mx + gx) / 2} y="362" text-anchor="middle">✓ 一致 → 検証成功</text>
+      <text class="ds-label" x={(mx + gx) / 2} y="396" text-anchor="middle">A 本人が作成・改ざんされていない</text>
+    </g>
+    <g class="ds-show" data-on-steps="7">
+      <rect class="ds-result ds-ng" x={(mx + gx) / 2 - 110} y="338" width="220" height="36" rx="8" />
+      <text class="ds-result-text ds-ng-text" x={(mx + gx) / 2} y="362" text-anchor="middle">✕ 不一致 → 検証失敗</text>
+      <text class="ds-label" x={(mx + gx) / 2} y="396" text-anchor="middle">改ざん（またはなりすまし）を検知</text>
+    </g>
+  </svg>
+  <Fragment slot="narration">
+    {narration.map((n, i) => <p data-step-only={i + 1}>{n}</p>)}
+  </Fragment>
+</Figure>
+
+<script>
+  import '../../scripts/step-on';
+</script>
+
+<style>
+  :global(.diagram-body) svg .ds-head {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .ds-divider {
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 5;
+  }
+  .ds-arrowhead {
+    fill: var(--fg-muted);
+  }
+  .ds-flow {
+    fill: none;
+    stroke: var(--fg-muted);
+    stroke-width: 2;
+    marker-end: url(#ds-arrow);
+  }
+  .ds-pill {
+    fill: var(--dg-fill);
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+  }
+  .ds-pill-key {
+    stroke: var(--key);
+    stroke-width: 2;
+  }
+  :global(.diagram-body) svg .ds-pill-text {
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .ds-chip {
+    fill: var(--bg);
+    stroke: var(--fg-muted);
+    stroke-width: 1.2;
+    stroke-dasharray: 3 3;
+  }
+  :global(.diagram-body) svg .ds-chip-text {
+    font-size: 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  :global(.diagram-body) svg .ds-mini {
+    font-size: 12px;
+    fill: var(--fg-muted);
+  }
+  :global(.diagram-body) svg .ds-chip-bad {
+    fill: var(--dg-warn);
+    font-weight: 700;
+  }
+  .ds-sig rect {
+    fill: var(--bg);
+    stroke: var(--fg-muted);
+    stroke-width: 1.5;
+  }
+  .ds-sig-pen {
+    fill: none;
+    stroke: var(--fg);
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  :global(.diagram-body) svg .ds-label {
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .ds-bad-badge {
+    fill: var(--dg-warn);
+  }
+  :global(.diagram-body) svg .ds-bad-text {
+    fill: var(--bg);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .ds-result {
+    stroke-width: 2;
+  }
+  .ds-ok {
+    fill: color-mix(in srgb, var(--dg-ok) 14%, var(--bg));
+    stroke: var(--dg-ok);
+  }
+  .ds-ng {
+    fill: color-mix(in srgb, var(--dg-warn) 14%, var(--bg));
+    stroke: var(--dg-warn);
+  }
+  :global(.diagram-body) svg .ds-result-text {
+    font-size: 15px;
+    font-weight: 700;
+  }
+  :global(.diagram-body) svg .ds-ok-text {
+    fill: var(--dg-ok);
+  }
+  :global(.diagram-body) svg .ds-ng-text {
+    fill: var(--dg-warn);
+  }
+  .ds-show {
+    opacity: 0;
+    transition: opacity 0.45s ease;
+  }
+  .ds-show.is-on {
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .ds-move.is-on {
+      animation: ds-move 1s ease both;
+    }
+  }
+  @keyframes ds-move {
+    from {
+      transform: translate(var(--fx), var(--fy));
+    }
+    to {
+      transform: translate(0, 0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ds-show {
+      transition: none;
+    }
+  }
+</style>

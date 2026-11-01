@@ -7,6 +7,8 @@ tags: [暗号, 認証, 頻出]
 related: [security/crypto/symmetric-and-public-key, security/crypto/pki, security/cia]
 ---
 
+import DigitalSignatureFlow from '../../../../components/diagrams/DigitalSignatureFlow.astro';
+
 ハッシュ関数は任意の長さのデータから固定長の値（ハッシュ値）を作る関数で、データの改ざん検知に使われます。
 これと公開鍵暗号の鍵ペアを組み合わせたものが **デジタル署名** で、「誰が作ったか」と「改ざんされていないか」を同時に確認できます。
 
@@ -47,6 +49,10 @@ related: [security/crypto/symmetric-and-public-key, security/crypto/pki, securit
 1. 受け取ったデジタル署名を **A の公開鍵** で復号（検証処理）し、ハッシュ値①を得る。
 2. 受け取ったメッセージから同じハッシュ関数でハッシュ値②を求める。
 3. ①と②が一致すれば検証成功。
+
+生成から検証までの流れを、ステップごとに辿ってみましょう。
+
+<DigitalSignatureFlow />
 
 | 一致した場合にわかること | 理由 |
 | --- | --- |

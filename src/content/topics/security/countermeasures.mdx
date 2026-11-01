@@ -7,6 +7,8 @@ tags: [頻出, 用語, プロトコル]
 related: [security/attacks, network/transport/tcp-udp, network/ip/ip-address/private-address, network/application/protocols, network/devices]
 ---
 
+import FirewallDmz from '../../../components/diagrams/FirewallDmz.astro';
+
 技術的セキュリティ対策は、ネットワーク機器やソフトウェアの機能で不正アクセスやマルウェアを防ぎ、発見する仕組みです。
 1つの対策ですべてを防ぐことはできないため、性質の異なる対策を重ねる **多層防御** が基本になります。
 
@@ -39,11 +41,9 @@ related: [security/attacks, network/transport/tcp-udp, network/ip/ip-address/pri
 
 **DMZ**（DeMilitarized Zone: 非武装地帯）は、インターネットと内部 LAN の間に設ける緩衝区域で、Web サーバ・メールサーバ・DNS サーバなどの **外部に公開するサーバ** を置きます。
 
-```text
-インターネット ─── ファイアウォール ─── 内部 LAN（社員 PC、業務サーバ）
-                          │
-                         DMZ（Web・メール・DNS などの公開サーバ）
-```
+上のルール表を使って、どの通信が通過し、どの通信が遮断されるかを順に見てみましょう。
+
+<FirewallDmz />
 
 - インターネット → DMZ: 公開サービスに必要な通信だけ許可
 - インターネット → 内部 LAN: 拒否

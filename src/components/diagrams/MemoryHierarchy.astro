@@ -1,0 +1,123 @@
+---
+/**
+ * 記憶階層のピラミッド図（静的な図）。上ほど高速・小容量・高価（ビット単価が高い）。
+ *
+ * 使い方（.mdx）:
+ *   <MemoryHierarchy />
+ *   <MemoryHierarchy title="…" caption="…" />
+ */
+import Figure from './Figure.astro';
+
+interface Props {
+  title?: string;
+  caption?: string;
+}
+const {
+  title = '記憶階層',
+  caption = 'CPU に近い上の階層ほど高速だが、容量が小さくビット単価が高い。下の階層ほど低速だが、大容量で安価。',
+} = Astro.props;
+
+const layers = [
+  { name: 'レジスタ', sub: 'CPU 内部の回路' },
+  { name: 'キャッシュメモリ', sub: 'SRAM（L1・L2…）' },
+  { name: '主記憶', sub: 'DRAM' },
+  { name: '補助記憶装置', sub: 'SSD、HDD など' },
+];
+
+const top = 16;
+const bottom = 296;
+const cx = 230;
+const topW = 124;
+const baseW = 316;
+const h = (bottom - top) / layers.length;
+const gap = 4;
+const widthAt = (y: number) => topW + ((baseW - topW) * (y - top)) / (bottom - top);
+const polys = layers.map((l, i) => {
+  const y1 = top + h * i + (i ? gap / 2 : 0);
+  const y2 = top + h * (i + 1) - (i < layers.length - 1 ? gap / 2 : 0);
+  const w1 = widthAt(y1) / 2;
+  const w2 = widthAt(y2) / 2;
+  const points = `${cx - w1},${y1} ${cx + w1},${y1} ${cx + w2},${y2} ${cx - w2},${y2}`;
+  return { ...l, points, cy: (y1 + y2) / 2, level: i };
+});
+---
+
+<Figure title={title} caption={caption}>
+  <svg class="mh" viewBox="0 0 460 312" style="max-width: 620px; margin: 0 auto;" role="img" aria-label="記憶階層のピラミッド図。上からレジスタ、キャッシュメモリ、主記憶、補助記憶装置。上ほど高速・小容量・高価">
+    <defs>
+      <marker id="mh-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" class="mh-arrowhead"></path>
+      </marker>
+    </defs>
+    {
+      polys.map((p) => (
+        <g>
+          <polygon class={`mh-layer mh-l${p.level}`} points={p.points} />
+          <text class="mh-name" x={cx} y={p.cy - 3} text-anchor="middle">
+            {p.name}
+          </text>
+          <text class="mh-sub" x={cx} y={p.cy + 17} text-anchor="middle">
+            {p.sub}
+          </text>
+        </g>
+      ))
+    }
+
+    <!-- 左: 速度・価格 -->
+    <line class="mh-axis" x1="30" y1="70" x2="30" y2="242" marker-start="url(#mh-arrow)" marker-end="url(#mh-arrow)" />
+    <text class="mh-side mh-strong" x="30" y="30" text-anchor="middle">高速</text>
+    <text class="mh-side" x="30" y="50" text-anchor="middle">高価</text>
+    <text class="mh-side mh-strong" x="30" y="270" text-anchor="middle">低速</text>
+    <text class="mh-side" x="30" y="290" text-anchor="middle">安価</text>
+
+    <!-- 右: 容量 -->
+    <line class="mh-axis" x1="426" y1="70" x2="426" y2="242" marker-start="url(#mh-arrow)" marker-end="url(#mh-arrow)" />
+    <text class="mh-side mh-strong" x="426" y="30" text-anchor="middle">小容量</text>
+    <text class="mh-side mh-strong" x="426" y="270" text-anchor="middle">大容量</text>
+  </svg>
+</Figure>
+
+<style>
+  .mh-layer {
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+  }
+  .mh-l0 {
+    fill: color-mix(in srgb, var(--accent) 42%, var(--dg-fill));
+  }
+  .mh-l1 {
+    fill: color-mix(in srgb, var(--accent) 28%, var(--dg-fill));
+  }
+  .mh-l2 {
+    fill: color-mix(in srgb, var(--accent) 14%, var(--dg-fill));
+  }
+  .mh-l3 {
+    fill: var(--dg-fill);
+  }
+  :global(.diagram-body) svg .mh-name {
+    font-weight: 700;
+    font-size: 16px;
+  }
+  :global(.diagram-body) svg .mh-sub {
+    font-size: 13px;
+    fill: var(--fg-muted);
+  }
+  .mh-l0 ~ .mh-sub {
+    fill: var(--fg);
+  }
+  .mh-axis {
+    stroke: var(--fg-muted);
+    stroke-width: 2;
+  }
+  .mh-arrowhead {
+    fill: var(--fg-muted);
+  }
+  :global(.diagram-body) svg .mh-side {
+    font-size: 15px;
+    fill: var(--fg-muted);
+  }
+  :global(.diagram-body) svg .mh-strong {
+    font-weight: 700;
+    fill: var(--fg);
+  }
+</style>

@@ -1,0 +1,251 @@
+---
+/**
+ * 正規化で表が分割されていく様子のステップ再生（非正規形 → 第1 → 第2 → 第3正規形）。
+ * stages の 1 つ目がステップ 0 で表示され、以降 1 ステップごとに次の段階に切り替わる。
+ *
+ * 使い方（.mdx）:
+ *   <NormalizationSteps
+ *     stages={[
+ *       { label: '非正規形', note: '…', tables: [{ name: '受注', columns: [{ name: '受注番号', key: true }, …], rows: [['1001', …]] }] },
+ *       …
+ *     ]}
+ *   />
+ * - columns の key: true は主キー（下線・太字）、fk: true は外部キー（点線の下線）
+ * - group（1〜5）を付けた列は色分けされる（どの表へ分かれていくかを示す）
+ * - groups={['受注', '商品', …]} を渡すと色の凡例を表示する（group 1 から順）
+ */
+import Figure from './Figure.astro';
+
+interface Column {
+  name: string;
+  key?: boolean;
+  fk?: boolean;
+  group?: number;
+}
+interface Table {
+  name: string;
+  columns: Column[];
+  rows: string[][];
+  /** その段階で新しくできた表 */
+  isNew?: boolean;
+}
+interface Stage {
+  label: string;
+  note: string;
+  tables: Table[];
+}
+interface Props {
+  title?: string;
+  caption?: string;
+  stages: Stage[];
+  groups?: string[];
+}
+const { title = '正規化の手順', caption, stages, groups = [] } = Astro.props;
+---
+
+<Figure title={title} caption={caption} steps={stages.length - 1}>
+  <div class="nm">
+    {
+      groups.length > 0 && (
+        <p class="nm-legend">
+          列の色 = 最終的に分かれる表：
+          {groups.map((g, i) => (
+            <span class={`nm-chip nm-g${i + 1}`}>{g}</span>
+          ))}
+        </p>
+      )
+    }
+    <div class="nm-stages">
+    {
+      stages.map((st, i) => (
+        <section class="nm-stage" data-step-only={i}>
+          <h4 class="nm-stage-label">
+            <span class="nm-stage-no">{i === 0 ? '開始' : `手順 ${i}`}</span>
+            {st.label}
+          </h4>
+          <div class="nm-tables">
+            {st.tables.map((t) => (
+              <div class:list={['nm-table-wrap', { 'is-new': t.isNew }]}>
+                <div class="nm-table-name">
+                  {t.name}
+                  {t.isNew && <span class="nm-new">分割</span>}
+                </div>
+                <div class="nm-scroll">
+                  <table class="nm-table">
+                    <thead>
+                      <tr>
+                        {t.columns.map((c) => (
+                          <th class:list={[{ 'is-key': c.key, 'is-fk': c.fk, 'is-long': c.name.length > 10 }, c.group ? `nm-g${c.group}` : '']}>{c.name}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {t.rows.map((r) => (
+                        <tr>
+                          {r.map((v, j) => (
+                            <td class:list={[t.columns[j]?.group ? `nm-g${t.columns[j].group}` : '', { 'is-long': v.length > 10 }]}>{v}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))
+    }
+    </div>
+  </div>
+  <Fragment slot="narration">
+    {stages.map((st, i) => <p data-step-only={i}>{st.note}</p>)}
+  </Fragment>
+</Figure>
+
+<style>
+  .nm {
+    --nm-g1: var(--dg-c1);
+    --nm-g2: var(--dg-c2);
+    --nm-g3: var(--dg-c3);
+    --nm-g4: var(--dg-c4);
+    --nm-g5: var(--dg-c5);
+  }
+  .nm-legend {
+    margin: 0 0 10px;
+    font-size: 0.82rem;
+    color: var(--fg-muted);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .nm-chip {
+    padding: 0 8px;
+    border-radius: 999px;
+    color: var(--fg);
+    border: 1px solid var(--c);
+    background: color-mix(in srgb, var(--c) 18%, var(--bg));
+  }
+  .nm-g1 {
+    --c: var(--nm-g1);
+  }
+  .nm-g2 {
+    --c: var(--nm-g2);
+  }
+  .nm-g3 {
+    --c: var(--nm-g3);
+  }
+  .nm-g4 {
+    --c: var(--nm-g4);
+  }
+  .nm-g5 {
+    --c: var(--nm-g5);
+  }
+  /* すべての段階を同じセルに重ね、高さを最も高い段階にそろえる（切り替えで本文が上下に動かないように） */
+  .nm-stages {
+    display: grid;
+  }
+  .nm-stage {
+    grid-area: 1 / 1;
+  }
+  .nm-stage[data-step-only]:not(.is-visible) {
+    display: block;
+    visibility: hidden;
+  }
+  .nm-stage-label {
+    margin: 0 0 10px;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .nm-stage-no {
+    font-size: 0.75rem;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+  .nm-tables {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    align-items: flex-start;
+  }
+  .nm-table-wrap {
+    max-width: 100%;
+  }
+  .nm-table-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .nm-new {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0 6px;
+    border-radius: 4px;
+    color: var(--dg-warn);
+    border: 1px solid var(--dg-warn);
+  }
+  .nm-scroll {
+    overflow-x: auto;
+  }
+  .nm-table {
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 0;
+  }
+  .nm-table th,
+  .nm-table td {
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+    background: var(--bg);
+    text-align: left;
+  }
+  .nm-table th {
+    font-weight: 600;
+  }
+  .nm-table th.is-long,
+  .nm-table td.is-long {
+    white-space: normal;
+    min-width: 9em;
+  }
+  .nm-table th[class*='nm-g'] {
+    background: color-mix(in srgb, var(--c) 22%, var(--bg));
+    border-top: 3px solid var(--c);
+  }
+  .nm-table td[class*='nm-g'] {
+    background: color-mix(in srgb, var(--c) 8%, var(--bg));
+  }
+  .nm-table th.is-key {
+    font-weight: 800;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+  .nm-table th.is-fk {
+    text-decoration: underline dashed;
+    text-underline-offset: 3px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .nm-stage.is-visible .nm-table-wrap.is-new {
+      animation: nm-pop 0.7s ease both;
+    }
+  }
+  @keyframes nm-pop {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+</style>

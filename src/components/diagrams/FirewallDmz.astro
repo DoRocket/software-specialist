@@ -1,0 +1,434 @@
+---
+/**
+ * ファイアウォールと DMZ のネットワーク構成図。パケットが通過（許可）／遮断（拒否）される様子を
+ * ステップ再生で見せ、どのフィルタリングルールに一致したかを下の表で強調する。
+ * ルール表と各パケットの判定は、記事「技術的セキュリティ対策」のルール表と一致させている。
+ *
+ * 使い方（.mdx）:
+ *   <FirewallDmz />
+ */
+import Figure from './Figure.astro';
+
+interface Props {
+  title?: string;
+  caption?: string;
+}
+const { title = 'ファイアウォールと DMZ', caption } = Astro.props;
+
+type Pt = [number, number];
+const fw: Pt = [236, 86];
+const pos = {
+  internet: [64, 86] as Pt,
+  pc: [404, 70] as Pt,
+  file: [404, 124] as Pt,
+  web: [186, 250] as Pt,
+  mail: [286, 250] as Pt,
+};
+
+// 機器の箱（中心と幅）
+const nodeBox = {
+  pc: { at: pos.pc, w: 124, name: '社員 PC' },
+  file: { at: pos.file, w: 124, name: 'ファイルサーバ' },
+  web: { at: pos.web, w: 92, name: 'Web サーバ' },
+  mail: { at: pos.mail, w: 92, name: 'メールサーバ' },
+  internet: { at: pos.internet, w: 120, name: '' },
+};
+
+const rules = [
+  { no: 1, src: 'すべて', dst: 'DMZ の Web サーバ', port: 'TCP / 443', act: '許可' },
+  { no: 2, src: 'すべて', dst: 'DMZ のメールサーバ', port: 'TCP / 25', act: '許可' },
+  { no: 3, src: '内部 LAN', dst: 'すべて', port: 'TCP / 443', act: '許可' },
+  { no: 4, src: 'すべて', dst: 'すべて', port: 'すべて', act: '拒否' },
+];
+
+/** path: 封筒（パケット）が通る点の列。最後の点で止まる。 */
+const packets: { label: string; path: Pt[]; dst: keyof typeof nodeBox; rule: number; ok: boolean; note: string }[] = [
+  {
+    label: 'TCP/443',
+    path: [pos.internet, fw, [236, 212], [186, 214]],
+    dst: 'web',
+    rule: 1,
+    ok: true,
+    note: 'インターネットから DMZ の Web サーバへの TCP / 443 は、ルール1に一致して許可されます。',
+  },
+  {
+    label: 'TCP/25',
+    path: [pos.internet, fw, [236, 212], [286, 214]],
+    dst: 'mail',
+    rule: 2,
+    ok: true,
+    note: 'インターネットから DMZ のメールサーバへの TCP / 25 は、ルール2に一致して許可されます。',
+  },
+  {
+    label: 'TCP/443',
+    path: [[372, 70], [330, 86], fw, [104, 86]],
+    dst: 'internet',
+    rule: 3,
+    ok: true,
+    note: '内部 LAN の社員 PC からインターネットへの TCP / 443 は、ルール3に一致して許可されます。',
+  },
+  {
+    label: 'TCP/443',
+    path: [pos.internet, [130, 86], [170, 86], [196, 86]],
+    dst: 'file',
+    rule: 4,
+    ok: false,
+    note: 'インターネットから内部 LAN のファイルサーバへの TCP / 443 は、ルール1〜3のどれにも一致せず、ルール4で拒否されます（上の例題）。',
+  },
+  {
+    label: 'TCP/443',
+    path: [[186, 232], [236, 212], [236, 170], [236, 136]],
+    dst: 'file',
+    rule: 4,
+    ok: false,
+    note: 'DMZ の Web サーバから内部 LAN への通信も、ルール1〜3に一致せず、ルール4で拒否されます。公開サーバが乗っ取られても、被害を内部に広げないためです。',
+  },
+];
+const steps = packets.length;
+const pts = (p: Pt[]) => p.map(([x, y]) => `${x},${y}`).join(' ');
+---
+
+<Figure title={title} caption={caption} steps={steps} intro="インターネット・DMZ・内部 LAN の境界にファイアウォールを置き、ルール表に従って通信を許可・拒否します。">
+  <svg class="fw" viewBox="0 0 480 300" style="max-width: 640px; margin: 0 auto;" role="img" aria-label="インターネット、ファイアウォール、DMZ、内部 LAN の構成図">
+    <!-- 区域 -->
+    <rect class="fw-zone fw-zone-lan" x="316" y="14" width="160" height="146" rx="12" />
+    <text class="fw-zone-label" x="396" y="36" text-anchor="middle">内部 LAN</text>
+    <rect class="fw-zone fw-zone-dmz" x="132" y="176" width="208" height="116" rx="12" />
+    <text class="fw-zone-label" x="236" y="286" text-anchor="middle">DMZ（公開サーバ）</text>
+
+    <!-- 配線 -->
+    <line class="fw-wire" x1="104" y1="86" x2={fw[0] - 28} y2="86" />
+    <line class="fw-wire" x1={fw[0] + 28} y1="86" x2="330" y2="86" />
+    <line class="fw-wire" x1="330" y1="70" x2="330" y2="124" />
+    <line class="fw-wire" x1="330" y1="70" x2="342" y2="70" />
+    <line class="fw-wire" x1="330" y1="124" x2="342" y2="124" />
+    <line class="fw-wire" x1={fw[0]} y1={fw[1] + 32} x2={fw[0]} y2="212" />
+    <line class="fw-wire" x1="186" y1="212" x2="286" y2="212" />
+    <line class="fw-wire" x1="186" y1="212" x2="186" y2="233" />
+    <line class="fw-wire" x1="286" y1="212" x2="286" y2="233" />
+
+    <!-- インターネット（雲） -->
+    <g transform={`translate(${pos.internet[0]} ${pos.internet[1]})`}>
+      <path class="fw-cloud" d="M-44,18 a16,16 0 0 1 2,-31 a20,20 0 0 1 36,-12 a22,22 0 0 1 40,10 a16,16 0 0 1 8,33 z" />
+      <text class="fw-node-label" y="8" text-anchor="middle">インターネット</text>
+    </g>
+
+    <!-- ファイアウォール（レンガ） -->
+    <g transform={`translate(${fw[0] - 28} ${fw[1] - 32})`}>
+      <rect class="fw-wall" width="56" height="64" rx="4" />
+      <path class="fw-brick" d="M0,16 H56 M0,32 H56 M0,48 H56 M28,0 V16 M14,16 V32 M42,16 V32 M28,32 V48 M14,48 V64 M42,48 V64" />
+    </g>
+    <text class="fw-fw-label" x={fw[0]} y={fw[1] - 40} text-anchor="middle">ファイアウォール</text>
+
+    <!-- 機器 -->
+    {
+      Object.values(nodeBox)
+        .filter((b) => b.name)
+        .map(({ at: [x, y], name, w }) => (
+        <g>
+          <rect class="fw-node" x={x - w / 2} y={y - 17} width={w} height="34" rx="6" />
+          <text class="fw-node-label" x={x} y={y + 5} text-anchor="middle">
+            {name}
+          </text>
+        </g>
+      ))
+    }
+
+    <!-- パケット（ステップごとに 1 つ） -->
+    {
+      packets.map((p, i) => {
+        const end = p.path[p.path.length - 1];
+        const off = (pt: Pt) => `${pt[0] - end[0]}px, ${pt[1] - end[1]}px`;
+        return (
+          <g data-step-only={i + 1} class:list={['fw-packet', p.ok ? 'is-ok' : 'is-ng']}>
+            <rect
+              class="fw-dst"
+              x={nodeBox[p.dst].at[0] - nodeBox[p.dst].w / 2 - 5}
+              y={nodeBox[p.dst].at[1] - (p.dst === 'internet' ? 34 : 22)}
+              width={nodeBox[p.dst].w + 10}
+              height={p.dst === 'internet' ? 64 : 44}
+              rx="9"
+            />
+            <polyline class="fw-route" points={pts(p.path)} />
+            <g transform={`translate(${end[0]} ${end[1]})`}>
+              <g class="fw-env-move" style={`--p0: ${off(p.path[0])}; --p1: ${off(p.path[1])}; --p2: ${off(p.path[2])};`}>
+                <rect class="fw-env" x="-15" y="-10" width="30" height="20" rx="3" />
+                <path class="fw-env-flap" d="M-15,-9 L0,2 L15,-9" />
+                <text class="fw-env-label" y="-16" text-anchor="middle">
+                  {p.label}
+                </text>
+              </g>
+              {!p.ok && (
+                <g class="fw-x" transform={p.path[0][1] > end[1] ? 'translate(26 6)' : 'translate(0 26)'}>
+                  <circle r="11" />
+                  <path d="M-5,-5 L5,5 M5,-5 L-5,5" />
+                </g>
+              )}
+            </g>
+            <g transform="translate(64 152)">
+              <rect class="fw-verdict" x="-56" y="-20" width="112" height="44" rx="8" />
+              <text class="fw-verdict-text" y="-1" text-anchor="middle">
+                {p.ok ? '✓ 許可' : '✕ 拒否'}
+              </text>
+              <text class="fw-verdict-sub" y="17" text-anchor="middle">
+                ルール{p.rule}に一致
+              </text>
+            </g>
+          </g>
+        );
+      })
+    }
+  </svg>
+
+  <table class="fw-rules">
+    <caption>フィルタリングルール（上から順に照合）</caption>
+    <thead>
+      <tr><th>番号</th><th>送信元</th><th>宛先</th><th>プロトコル / 宛先ポート</th><th>動作</th></tr>
+    </thead>
+    <tbody>
+      {
+        rules.map((r) => (
+          <tr
+            class:list={['fw-rule', r.act === '許可' ? 'is-allow' : 'is-deny']}
+            data-on-steps={packets
+              .map((p, i) => (p.rule === r.no ? i + 1 : -1))
+              .filter((n) => n > 0)
+              .join(' ')}
+          >
+            <td>{r.no}</td>
+            <td>{r.src}</td>
+            <td>{r.dst}</td>
+            <td>{r.port}</td>
+            <td>{r.act}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+
+  <Fragment slot="narration">
+    {packets.map((p, i) => <p data-step-only={i + 1}>{p.note}</p>)}
+  </Fragment>
+</Figure>
+
+<script>
+  import '../../scripts/step-on';
+</script>
+
+<style>
+  .fw-zone {
+    stroke-width: 1.5;
+    stroke-dasharray: 6 4;
+  }
+  .fw-zone-lan {
+    fill: color-mix(in srgb, var(--dg-c1) 8%, transparent);
+    stroke: var(--dg-c1);
+  }
+  .fw-zone-dmz {
+    fill: color-mix(in srgb, var(--dg-c3) 10%, transparent);
+    stroke: var(--dg-c3);
+  }
+  :global(.diagram-body) svg .fw-zone-label {
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .fw-wire {
+    stroke: var(--dg-stroke);
+    stroke-width: 2.5;
+  }
+  .fw-cloud {
+    fill: var(--dg-fill);
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+  }
+  .fw-wall {
+    fill: color-mix(in srgb, var(--dg-warn) 22%, var(--bg));
+    stroke: var(--dg-warn);
+    stroke-width: 1.5;
+  }
+  .fw-brick {
+    fill: none;
+    stroke: var(--dg-warn);
+    stroke-width: 1;
+    opacity: 0.7;
+  }
+  :global(.diagram-body) svg .fw-fw-label {
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .fw-node {
+    fill: var(--bg);
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+  }
+  :global(.diagram-body) svg .fw-node-label {
+    font-size: 14px;
+  }
+  .fw-dst {
+    fill: none;
+    stroke-width: 2.5;
+    stroke-dasharray: 5 4;
+  }
+  .is-ok .fw-dst {
+    stroke: var(--dg-ok);
+  }
+  .is-ng .fw-dst {
+    stroke: var(--dg-warn);
+  }
+  .fw-route {
+    fill: none;
+    stroke-width: 4;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    opacity: 0.55;
+  }
+  .is-ok .fw-route {
+    stroke: var(--dg-ok);
+  }
+  .is-ng .fw-route {
+    stroke: var(--dg-warn);
+    stroke-dasharray: 2 7;
+  }
+  .fw-env {
+    fill: var(--bg);
+    stroke: var(--accent);
+    stroke-width: 2;
+  }
+  .fw-env-flap {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+  }
+  :global(.diagram-body) svg .fw-env-label {
+    font-size: 13px;
+    font-weight: 700;
+    paint-order: stroke;
+    stroke: var(--bg-subtle);
+    stroke-width: 4px;
+    stroke-linejoin: round;
+  }
+  .fw-x circle {
+    fill: var(--bg);
+    stroke: var(--dg-warn);
+    stroke-width: 2;
+  }
+  .fw-x path {
+    stroke: var(--dg-warn);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+  .fw-verdict {
+    stroke-width: 2;
+  }
+  .is-ok .fw-verdict {
+    fill: color-mix(in srgb, var(--dg-ok) 14%, var(--bg));
+    stroke: var(--dg-ok);
+  }
+  .is-ng .fw-verdict {
+    fill: color-mix(in srgb, var(--dg-warn) 14%, var(--bg));
+    stroke: var(--dg-warn);
+  }
+  :global(.diagram-body) svg .fw-verdict-text {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  :global(.diagram-body) svg .is-ok .fw-verdict-text {
+    fill: var(--dg-ok);
+  }
+  :global(.diagram-body) svg .is-ng .fw-verdict-text {
+    fill: var(--dg-warn);
+  }
+  :global(.diagram-body) svg .fw-verdict-sub {
+    font-size: 13px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .fw-packet.is-visible .fw-env-move {
+      animation: fw-move 1.3s ease-in-out both;
+    }
+    .fw-packet.is-visible .fw-x,
+    .fw-packet.is-visible .fw-verdict,
+    .fw-packet.is-visible .fw-verdict-text,
+    .fw-packet.is-visible .fw-verdict-sub {
+      animation: fw-appear 1.6s ease both;
+    }
+  }
+  @keyframes fw-move {
+    0% {
+      transform: translate(var(--p0));
+    }
+    40% {
+      transform: translate(var(--p1));
+    }
+    70% {
+      transform: translate(var(--p2));
+    }
+    100% {
+      transform: translate(0, 0);
+    }
+  }
+  @keyframes fw-appear {
+    0%,
+    75% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  /* ルール表 */
+  .fw-rules {
+    width: 100%;
+    margin: 12px 0 0;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  .fw-rules caption {
+    text-align: left;
+    font-size: 0.82rem;
+    color: var(--fg-muted);
+    margin-bottom: 4px;
+  }
+  .fw-rules th,
+  .fw-rules td {
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    text-align: left;
+  }
+  .fw-rules td:first-child,
+  .fw-rules td:last-child,
+  .fw-rules th:first-child,
+  .fw-rules th:last-child {
+    white-space: nowrap;
+  }
+  @media (max-width: 640px) {
+    .fw-rules {
+      font-size: 0.76rem;
+    }
+    .fw-rules th,
+    .fw-rules td {
+      padding: 3px 4px;
+    }
+  }
+  .fw-rules th {
+    background: var(--bg);
+    font-weight: 700;
+  }
+  .fw-rule td {
+    transition: background-color 0.3s ease;
+  }
+  .fw-rule.is-on td {
+    font-weight: 700;
+  }
+  .fw-rule.is-allow.is-on td {
+    background: color-mix(in srgb, var(--dg-ok) 18%, var(--bg));
+  }
+  .fw-rule.is-deny.is-on td {
+    background: color-mix(in srgb, var(--dg-warn) 18%, var(--bg));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fw-rule td {
+      transition: none;
+    }
+  }
+</style>
