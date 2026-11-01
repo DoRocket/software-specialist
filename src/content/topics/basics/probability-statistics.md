@@ -76,11 +76,12 @@ related: [basics/information-theory, basics/algorithms/sorting]
 **解き方**
 
 $$
-\begin{aligned}
-\text{平均} &= \frac{2+4+4+4+5+5+7+9}{8} = \frac{40}{8} = 5 \\[6pt]
-\text{偏差の2乗} &= 9,\ 1,\ 1,\ 1,\ 0,\ 0,\ 4,\ 16 \rightarrow \text{合計 } 32 \\[6pt]
-\text{分散} &= \frac{32}{8} = 4 \qquad \text{標準偏差} = \sqrt{4} = 2
-\end{aligned}
+\def\arraystretch{2.2}
+\begin{array}{ll}
+\text{平均} &{}= \dfrac{2+4+4+4+5+5+7+9}{8} = \dfrac{40}{8} = 5 \\
+\text{偏差の2乗} &{}= 9,\ 1,\ 1,\ 1,\ 0,\ 0,\ 4,\ 16 \rightarrow \text{合計 } 32 \\
+\text{分散} &{}= \dfrac{32}{8} = 4 \qquad \text{標準偏差} = \sqrt{4} = 2
+\end{array}
 $$
 
 **例題3** 試験の得点が平均 60 点・標準偏差 10 点の正規分布に従うとき、80 点以上の受験者はおよそ何 % か。

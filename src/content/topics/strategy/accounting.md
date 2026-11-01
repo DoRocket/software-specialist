@@ -47,11 +47,12 @@ related: [strategy/business-analysis]
 売上高と総費用が等しく、利益が 0 になる売上高を **損益分岐点売上高** といいます。
 
 $$
-\begin{aligned}
-\text{変動費率} &= \frac{\text{変動費}}{\text{売上高}} \\[6pt]
-\text{損益分岐点売上高} &= \frac{\text{固定費}}{1 - \text{変動費率}} \\[6pt]
-\text{目標利益を達成する売上高} &= \frac{\text{固定費} + \text{目標利益}}{1 - \text{変動費率}}
-\end{aligned}
+\def\arraystretch{2.2}
+\begin{array}{ll}
+\text{変動費率} &{}= \dfrac{\text{変動費}}{\text{売上高}} \\
+\text{損益分岐点売上高} &{}= \dfrac{\text{固定費}}{1 - \text{変動費率}} \\
+\text{目標利益を達成する売上高} &{}= \dfrac{\text{固定費} + \text{目標利益}}{1 - \text{変動費率}}
+\end{array}
 $$
 
 $1 - \text{変動費率}$ を **限界利益率** といい、売上高のうち固定費の回収と利益に回る割合を表します。
