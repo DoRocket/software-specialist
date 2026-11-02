@@ -4,7 +4,8 @@ order: 1
 summary: ドメイン名とIPアドレスを対応付ける名前解決の仕組み。リゾルバ、権威DNSサーバ、主なリソースレコード
 exams: [ip, fe, ap]
 tags: [頻出, プロトコル, 用語]
-related: [network/application/dhcp, network/transport/tcp-udp]
+related: [network/application/dhcp]
+prerequisites: [network/transport/tcp-udp]
 quiz:
   - q: 'DNS のリソースレコードのうち、そのドメイン宛てのメールを受け取るメールサーバを示すものはどれか。'
     choices: ['A', 'MX', 'CNAME', 'PTR']
@@ -39,6 +40,15 @@ quiz:
     answer: 3
     explanation: 'DNSSEC は署名で応答が改ざんされていないことを検証でき、偽の応答をキャッシュさせる攻撃への対策になる。送信元ポートは固定ではなくランダム化することで偽の応答を当てにくくする。外部からの再帰問合せの受付（オープンリゾルバ）は、むしろ攻撃に悪用されるため制限すべき状態。'
     level: ap
+  - q: 'Webサイトを新しいサーバへ移し、権威DNSサーバの A レコードを新しい IPアドレスに書き換えた。しかし、しばらくの間、一部の利用者は古いサーバに接続していた。最も考えられる理由はどれか。'
+    choices:
+      - 'MX レコードを書き換えていないため'
+      - 'キャッシュDNSサーバや PC が、変更前の A レコードを TTL の間キャッシュしているため'
+      - '逆引き用の PTR レコードが優先して使われるため'
+      - 'DNS の問合せが TCP ではなく UDP で行われるため'
+    answer: 1
+    explanation: 'フルサービスリゾルバや PC は、受け取った答えを TTL の間キャッシュして使い続ける。そのため権威DNSサーバを書き換えても、キャッシュが切れるまでは古いアドレスが返ることがある。移転の前に TTL を短くしておくと、切り替わりを早められる。MX はメールの受信サーバ、PTR は逆引きの情報で、Webサイトの名前解決とは関係しない。'
+    level: fe
 ---
 
 import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.astro';
@@ -119,6 +129,75 @@ DNS の問合せは通常 **UDP の 53 番ポート** を使います。応答�
 | DNSSEC | 応答にデジタル署名を付け、改ざんされていないことを検証できるようにする対策 |
 | 送信元ポートのランダム化 | 偽の応答を当てにくくし、キャッシュポイズニングを困難にする |
 | オープンリゾルバ対策 | 外部の誰からでも再帰問合せを受け付ける状態は DDoS（DNSリフレクション攻撃）に悪用されるため、問合せ元を制限する |
+
+## 実際の進め方
+
+### 名前解決を試す
+
+```
+nslookup www.minato.example                 # Windows・macOS・Linux: A レコードなどを調べる
+nslookup -type=MX minato.example            # 種類を指定して調べる（ここでは MX）
+nslookup www.minato.example 192.168.10.1    # 問い合わせる DNSサーバを指定する
+dig www.minato.example                      # macOS・Linux（dig がある場合）: 詳しく表示する
+dig +short MX minato.example                # 答えだけを短く表示する
+Resolve-DnsName www.minato.example          # Windows PowerShell
+ipconfig /displaydns                        # Windows: PC 自身が持っている DNS のキャッシュを表示
+ipconfig /flushdns                          # Windows: PC 自身の DNS のキャッシュを消す
+```
+
+macOS や Linux でも PC 側のキャッシュを消す方法はありますが、OS の版や使っている仕組みによって異なります。
+`dig` の結果は、例えば次のように表示されます（形式を示すための例で、一部を省略しています）。
+
+```
+;; QUESTION SECTION:
+;www.minato.example.            IN      A
+
+;; ANSWER SECTION:
+www.minato.example.     3600    IN      A       198.51.100.20
+
+;; SERVER: 192.168.10.1#53(192.168.10.1)
+```
+
+- `ANSWER SECTION` の `3600` が TTL（秒）で、`A` がレコードの種類、最後が答えの IPアドレスです。キャッシュから返った答えでは、TTL は残りの秒数になり、問い合わせるたびに減っていきます。
+- `SERVER` は答えを返した DNSサーバで、`#53` はポート番号です。
+- `nslookup` では「権限のない回答（Non-authoritative answer）」と表示されることがあります。権威DNSサーバではなく、キャッシュDNSサーバから返った答えという意味で、誤りという意味ではありません。
+
+### よくあるトラブルと確かめ方
+
+| 症状 | 考えられること | 確かめ方 |
+| --- | --- | --- |
+| IPアドレスを指定すると通信できるのに、名前ではつながらない | PC に設定された DNSサーバの誤りや停止 | `ipconfig /all` で DNSサーバを確認し、`nslookup` でサーバを指定して比べる |
+| レコードを変更したのに古い答えが返る | キャッシュDNSサーバや PC が TTL の間キャッシュしている | 権威DNSサーバを指定して問い合わせ、新しい値になっているかを確かめる。PC 側は `ipconfig /flushdns` |
+| 社外からは見えるのに社内からは見えない（または逆） | 社内向けと社外向けで別の DNS の情報を使っている | どの DNSサーバに問い合わせているかを確かめる |
+
+サーバの移転などで A レコードを変えるときは、**数日前に TTL を短く（例: 300秒）しておき**、変更が済んで落ち着いたら元に戻すのが定番の手順です。
+TTL が長いままだと、変更後も最大でその秒数のあいだ古い答えがキャッシュに残ります。
+
+## 事例
+
+[みなと事務所](../../)（社員30名・来客用 Wi-Fi あり）の DNS は、次のような分担になっています。
+
+- **社内の PC の DNSサーバ**: DHCP でルータ（192.168.10.1 など）を配っています。ルータは PC からの問合せを ISP のフルサービスリゾルバに転送し、答えをキャッシュします（ルータが DNS の問合せを取り次ぐ役）。
+- **社内だけで使う名前**: ルータの DNS 機能に `nas.in.minato.example → 192.168.20.10` を登録し、社員が IPアドレスを覚えなくても NAS を開けるようにしています。この名前は社外の DNS には登録していないので、インターネットからは引けません。
+- **自社ドメインの権威DNSサーバ**: ドメインの管理を委託している事業者の DNS サービスで、次のようなレコードを管理しています（`mail-service.example` は利用しているクラウドのメールサービスを表す例です）。
+
+```
+www.minato.example.   3600  IN  A    198.51.100.20
+minato.example.       3600  IN  MX   10 mx1.mail-service.example.
+minato.example.       3600  IN  TXT  "v=spf1 include:_spf.mail-service.example -all"
+```
+
+MX はメールの受信サーバ、TXT は送信ドメイン認証（SPF）の設定です。
+
+**サイトの移転**: レンタルサーバを変え、www.minato.example の IPアドレスが 198.51.100.20 から 198.51.100.40 に変わることになりました。
+
+1. 移転の1週間前に、A レコードの TTL を 3600秒から 300秒に下げた
+2. 当日、新しいサーバの準備ができてから A レコードを 198.51.100.40 に変更した
+3. 権威DNSサーバを指定した `dig` で新しい値を確かめ、ルータ経由の `nslookup www.minato.example` でも数分後に新しい値に変わったことを確かめた
+4. 1台の PC だけ古いサイトが表示されたため、`ipconfig /flushdns` で PC のキャッシュを消すと新しいサイトが表示された
+5. 数日たって問題がないことを確かめてから、TTL を 3600秒に戻した
+
+TTL を先に下げておいたので、PC 側にキャッシュが残っていた1台を除けば、切り替えは数分ほどで行き渡りました。
 
 ## 試験対策のポイント
 
