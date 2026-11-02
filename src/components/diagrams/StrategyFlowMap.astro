@@ -1,0 +1,177 @@
+---
+/**
+ * 経営戦略の分析フレームワークの地図。外部環境 → 内部環境 → 統合 → 戦略立案 → 目標・評価 の順に、
+ * 各段階の「問い」「使う手法」「得られるもの」を箱で並べる静的な図。
+ * 箱は HTML で組むので、スマートフォンでは縦に並ぶ。
+ *
+ * 使い方（.mdx）:
+ *   <StrategyFlowMap />
+ *   <StrategyFlowMap highlight={3} />   … 3 番目（統合）の段階を強調する
+ */
+import Figure from './Figure.astro';
+
+interface Props {
+  title?: string;
+  caption?: string;
+  /** 強調する段階（1〜5）。省略時は強調なし */
+  highlight?: number;
+}
+const { title = '分析フレームワークの地図（使う順番）', caption, highlight } = Astro.props;
+
+interface Stage {
+  no: number;
+  color: 1 | 2 | 3 | 4 | 5;
+  name: string;
+  question: string;
+  tools: string[];
+  output: string;
+}
+
+const stages: Stage[] = [
+  {
+    no: 1,
+    color: 1,
+    name: '外部環境を見る',
+    question: '世の中と業界で何が起きているか',
+    tools: ['PEST 分析（マクロ環境）', 'ファイブフォース分析（業界）', '3C の顧客（Customer）'],
+    output: '機会・脅威',
+  },
+  {
+    no: 2,
+    color: 2,
+    name: '内部環境を見る',
+    question: '自社は競合と比べて何が得意で、何が足りないか',
+    tools: ['3C の自社・競合', 'バリューチェーン分析', 'VRIO 分析'],
+    output: '強み・弱み',
+  },
+  {
+    no: 3,
+    color: 3,
+    name: '統合する',
+    question: '強みを機会にどう生かし、弱みと脅威にどう備えるか',
+    tools: ['SWOT 分析', 'クロス SWOT 分析'],
+    output: '戦略の選択肢',
+  },
+  {
+    no: 4,
+    color: 4,
+    name: '戦略を決める',
+    question: 'どの事業に資源を配分し、どの方向へ伸び、どう戦うか',
+    tools: ['PPM（事業の資源配分）', 'アンゾフの成長マトリクス', 'ポーターの基本戦略・競争地位別の戦略'],
+    output: '全社戦略・事業戦略',
+  },
+  {
+    no: 5,
+    color: 5,
+    name: '目標を決めて測る',
+    question: '戦略の進み具合を何で測るか',
+    tools: ['バランススコアカード', 'CSF・KGI・KPI'],
+    output: '目標値と評価の仕組み',
+  },
+];
+---
+
+<Figure title={title} caption={caption}>
+  <ol class="sfm">
+    {
+      stages.map((s) => (
+        <li class:list={['sfm-stage', { 'is-hl': highlight === s.no, 'is-dim': highlight !== undefined && highlight !== s.no }]} style={`--c: var(--dg-c${s.color})`}>
+          <span class="sfm-no" aria-hidden="true">{s.no}</span>
+          <span class="sfm-name">{s.name}</span>
+          <span class="sfm-q">{s.question}</span>
+          <ul class="sfm-tools">
+            {s.tools.map((t) => (
+              <li>{t}</li>
+            ))}
+          </ul>
+          <span class="sfm-out">→ {s.output}</span>
+        </li>
+      ))
+    }
+  </ol>
+</Figure>
+
+<style>
+  .sfm {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .sfm-stage {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 10px 10px 12px;
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--c);
+    border-radius: 8px;
+    background: var(--bg);
+    font-size: 0.85rem;
+    line-height: 1.55;
+    min-width: 0;
+  }
+  .sfm-stage:not(:last-child)::after {
+    content: '▶';
+    position: absolute;
+    right: -10px;
+    top: 50%;
+    transform: translate(50%, -50%);
+    color: var(--fg-muted);
+    font-size: 0.7rem;
+  }
+  .sfm-stage.is-hl {
+    box-shadow: 0 0 0 2px var(--c);
+  }
+  .sfm-stage.is-dim {
+    opacity: 0.6;
+  }
+  .sfm-no {
+    display: inline-grid;
+    place-items: center;
+    width: 1.6em;
+    height: 1.6em;
+    border-radius: 50%;
+    background: var(--c);
+    color: var(--bg);
+    font-weight: 700;
+    font-size: 0.8rem;
+  }
+  .sfm-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+  .sfm-q {
+    color: var(--fg-muted);
+  }
+  .sfm-tools {
+    margin: 0;
+    padding-left: 1.1em;
+  }
+  .sfm-tools li {
+    margin: 0;
+  }
+  .sfm-out {
+    margin-top: auto;
+    font-weight: 700;
+    color: var(--fg);
+  }
+  @media (max-width: 860px) {
+    .sfm {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 18px;
+    }
+    .sfm-stage:not(:last-child)::after {
+      content: '▼';
+      right: auto;
+      left: 50%;
+      top: auto;
+      bottom: -9px;
+      transform: translate(-50%, 50%);
+    }
+  }
+</style>
