@@ -5,6 +5,36 @@ summary: AND・OR・NOT・XOR などの論理演算と真理値表、ド・モ�
 exams: [ip, fe, ap]
 tags: [論理演算, ハードウェア, 頻出]
 related: [basics/number-systems/radix-conversion, basics/number-systems/complement, computer/cpu]
+quiz:
+  - q: '論理式 $\lnot(A \cdot \lnot B)$ と等しいものはどれか。'
+    choices: ['$\lnot A + B$', '$\lnot A \cdot B$', '$A + \lnot B$', '$\lnot A \cdot \lnot B$']
+    answer: 0
+    explanation: 'ド・モルガンの法則で、全体の否定を外すと各項が否定され AND が OR に入れ替わる。$\lnot(A \cdot \lnot B) = \lnot A + \lnot(\lnot B) = \lnot A + B$。イは AND を OR に入れ替え忘れた誤り。'
+    level: fe
+  - q: '入力 A・B がともに 1 のときだけ出力が 0 になり、それ以外の組合せでは出力が 1 になる演算はどれか。'
+    choices: ['XOR', 'NOR', 'NAND', 'OR']
+    answer: 2
+    explanation: 'NAND は AND の結果を反転したもので、両方が 1 のときだけ 0 になる。XOR は入力が (0, 0) のときも 0、NOR は 1 つでも 1 があれば 0、OR は両方 1 のとき 1 になる。'
+    level: ip
+  - q: '8ビットのデータ `0110 1001` の上位4ビットはそのままにし、下位4ビットだけを反転したい。どの値とどの演算を行えばよいか。'
+    choices: ['`0000 1111` との AND', '`0000 1111` との XOR', '`1111 0000` との XOR', '`0000 1111` との OR']
+    answer: 1
+    explanation: '1 との XOR はビットを反転し、0 との XOR はそのまま残す。`0110 1001` XOR `0000 1111` = `0110 0110`。アは上位を 0 にして下位を残す（マスク）、エは下位を 1 にする操作、ウは上位を反転してしまう。'
+    level: fe
+  - q: '半加算器の和 S と桁上がり C を表す論理式の組合せとして、適切なものはどれか。'
+    choices:
+      - 'S = A AND B、C = A XOR B'
+      - 'S = A OR B、C = A AND B'
+      - 'S = A XOR B、C = A OR B'
+      - 'S = A XOR B、C = A AND B'
+    answer: 3
+    explanation: '$1 + 1 = (10)_2$ のように、和は 2 入力が異なるときだけ 1（XOR）、桁上がりは両方が 1 のときだけ 1（AND）になる。S を OR にすると A = B = 1 のとき和が 1 になってしまい、C を OR にすると $0 + 1$ でも桁上がりが出てしまう。'
+    level: fe
+  - q: '8ビットのデータ `1100 1010` と `1010 0110` のビットごとの排他的論理和（XOR）はどれか。'
+    choices: ['`0110 1100`', '`1000 0010`', '`1110 1110`', '`1001 0011`']
+    answer: 0
+    explanation: '各ビットで、2 つが異なるとき 1 になる。上位4ビットは `1100` と `1010` で `0110`、下位4ビットは `1010` と `0110` で `1100`。よって `0110 1100`。イは AND、ウは OR の結果、エは XOR の結果をさらに反転したもの。'
+    level: fe
 ---
 
 import LogicGateSimulator from '../../../components/diagrams/LogicGateSimulator.astro';

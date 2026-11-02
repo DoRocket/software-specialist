@@ -1,0 +1,262 @@
+---
+/**
+ * 記事末尾の確認問題。フロントマターの quiz から描画する。
+ * 選択肢を選ぶとその場で正誤と解説を表示し、正答数を数える（「もう一度」でリセット）。
+ * 問題文・選択肢・解説では $...$ の数式と `コード` が使える（ビルド時に描画）。
+ */
+import katex from 'katex';
+import { examById, type ExamId } from '../data/exams';
+
+interface QuizItem {
+  q: string;
+  choices: string[];
+  answer: number;
+  explanation: string;
+  level?: ExamId;
+}
+interface Props {
+  items: QuizItem[];
+}
+const { items } = Astro.props;
+
+const LABELS = ['ア', 'イ', 'ウ', 'エ', 'オ'];
+
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** $数式$ と `コード` を HTML にする。それ以外はエスケープしたテキスト */
+function rich(text: string): string {
+  return text
+    .split(/(\$[^$]+\$|`[^`]+`)/g)
+    .map((part) => {
+      if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
+        return katex.renderToString(part.slice(1, -1), { throwOnError: false, strict: 'ignore', output: 'html' });
+      }
+      if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+        return `<code>${escapeHtml(part.slice(1, -1))}</code>`;
+      }
+      return escapeHtml(part).replace(/\n/g, '<br>');
+    })
+    .join('');
+}
+---
+
+{
+  items.length > 0 && (
+    <section class="quiz" data-quiz aria-labelledby="quiz-heading">
+      <div class="quiz-head">
+        <h2 id="quiz-heading">確認問題</h2>
+        <span class="quiz-score" data-quiz-score aria-live="polite">
+          全 {items.length} 問
+        </span>
+      </div>
+      <ol class="quiz-list">
+        {items.map((item, i) => (
+          <li class="quiz-item" data-quiz-item data-answer={item.answer}>
+            <p class="quiz-q">
+              <span class="quiz-no">問{i + 1}</span>
+              {item.level && <span class={`exam-badge exam-${item.level}`}>{examById[item.level].short}</span>}
+              <span set:html={rich(item.q)} />
+            </p>
+            <div class="quiz-choices" role="group" aria-label={`問${i + 1} の選択肢`}>
+              {item.choices.map((c, j) => (
+                <button type="button" class="quiz-choice" data-choice={j}>
+                  <span class="quiz-label">{LABELS[j]}</span>
+                  <span set:html={rich(c)} />
+                </button>
+              ))}
+            </div>
+            <div class="quiz-explain" data-quiz-explain hidden>
+              <p class="quiz-verdict" data-quiz-verdict />
+              <p>
+                <strong>正解: {LABELS[item.answer]}</strong>　<span set:html={rich(item.explanation)} />
+              </p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <button type="button" class="dg-btn quiz-reset" data-quiz-reset hidden>
+        もう一度解く
+      </button>
+      <noscript>
+        <style>{'.quiz-explain{display:block !important}'}</style>
+      </noscript>
+    </section>
+  )
+}
+
+<script>
+  for (const quiz of document.querySelectorAll<HTMLElement>('[data-quiz]')) {
+    const items = [...quiz.querySelectorAll<HTMLElement>('[data-quiz-item]')];
+    const score = quiz.querySelector<HTMLElement>('[data-quiz-score]')!;
+    const reset = quiz.querySelector<HTMLButtonElement>('[data-quiz-reset]')!;
+
+    const update = () => {
+      const answered = items.filter((it) => it.dataset.state);
+      const correct = answered.filter((it) => it.dataset.state === 'correct').length;
+      score.textContent = answered.length
+        ? `${answered.length} / ${items.length} 問解答 ・ 正解 ${correct} 問`
+        : `全 ${items.length} 問`;
+      reset.hidden = answered.length === 0;
+    };
+
+    for (const item of items) {
+      const answer = Number(item.dataset.answer);
+      const buttons = [...item.querySelectorAll<HTMLButtonElement>('[data-choice]')];
+      const explain = item.querySelector<HTMLElement>('[data-quiz-explain]')!;
+      const verdict = item.querySelector<HTMLElement>('[data-quiz-verdict]')!;
+      for (const btn of buttons) {
+        btn.addEventListener('click', () => {
+          if (item.dataset.state) return;
+          const chosen = Number(btn.dataset.choice);
+          const ok = chosen === answer;
+          item.dataset.state = ok ? 'correct' : 'wrong';
+          btn.classList.add(ok ? 'is-correct' : 'is-wrong');
+          buttons[answer].classList.add('is-correct');
+          for (const b of buttons) b.setAttribute('aria-disabled', 'true');
+          verdict.textContent = ok ? '◯ 正解！' : '✕ 不正解';
+          explain.hidden = false;
+          update();
+        });
+      }
+    }
+
+    reset.addEventListener('click', () => {
+      for (const item of items) {
+        delete item.dataset.state;
+        item.querySelector<HTMLElement>('[data-quiz-explain]')!.hidden = true;
+        for (const b of item.querySelectorAll<HTMLButtonElement>('[data-choice]')) {
+          b.classList.remove('is-correct', 'is-wrong');
+          b.removeAttribute('aria-disabled');
+        }
+      }
+      update();
+      quiz.scrollIntoView({ block: 'start' });
+    });
+  }
+</script>
+
+<style>
+  .quiz {
+    margin-top: 48px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-subtle);
+  }
+  .quiz-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .quiz-head h2 {
+    margin: 0;
+    font-size: 1.2rem;
+  }
+  .quiz-score {
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+  }
+  .quiz-list {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 0;
+  }
+  .quiz-item {
+    padding: 16px 0;
+    border-top: 1px solid var(--border);
+  }
+  .quiz-q {
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+  .quiz-no {
+    display: inline-block;
+    margin-right: 8px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-size: 0.8rem;
+  }
+  .quiz-q .exam-badge {
+    margin-right: 6px;
+  }
+  .quiz-choices {
+    display: grid;
+    gap: 6px;
+  }
+  .quiz-choice {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .quiz-choice:hover:not([aria-disabled]) {
+    border-color: var(--accent);
+  }
+  .quiz-choice[aria-disabled] {
+    cursor: default;
+  }
+  .quiz-label {
+    flex: none;
+    font-weight: 700;
+    color: var(--fg-muted);
+  }
+  .quiz-choice.is-correct {
+    border-color: var(--dg-ok);
+    background: color-mix(in srgb, var(--dg-ok) 14%, var(--bg));
+  }
+  .quiz-choice.is-wrong {
+    border-color: var(--dg-warn);
+    background: color-mix(in srgb, var(--dg-warn) 14%, var(--bg));
+  }
+  .quiz-explain {
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--bg);
+    border-left: 4px solid var(--accent);
+    font-size: 0.92rem;
+  }
+  .quiz-explain p {
+    margin: 0;
+  }
+  .quiz-explain p + p {
+    margin-top: 4px;
+  }
+  .quiz-verdict {
+    font-weight: 700;
+  }
+  [data-state='correct'] .quiz-verdict {
+    color: var(--dg-ok);
+  }
+  [data-state='wrong'] .quiz-verdict {
+    color: var(--dg-warn);
+  }
+  .quiz-reset {
+    margin-top: 8px;
+  }
+  /* set:html で入れたコード表記にはスコープ付きの指定が届かないため :global を使う。
+     長い IPv6 アドレスなどがスマートフォンではみ出さないよう、途中でも折り返す */
+  .quiz :global(code) {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--bg-code);
+    padding: 1px 5px;
+    border-radius: 4px;
+    overflow-wrap: anywhere;
+  }
+</style>

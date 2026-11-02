@@ -5,6 +5,44 @@ summary: 関係データベースを操作する言語。SELECT・集約・GROUP
 exams: [fe, ap]
 tags: [SQL, 頻出]
 related: [database/relational-model, database/normalization, database/transaction]
+quiz:
+  - q: '社員表の部署コード列には、5 行分の値として D1、D2、NULL、D1、NULL が入っている。`SELECT COUNT(*), COUNT(部署コード), COUNT(DISTINCT 部署コード) FROM 社員` の結果はどれか。'
+    choices: ['5, 5, 2', '3, 3, 2', '5, 3, 3', '5, 3, 2']
+    answer: 3
+    explanation: '`COUNT(*)` は NULL を含む行も数えるので 5。`COUNT(部署コード)` は NULL を数えないので 3（D1、D2、D1）。`COUNT(DISTINCT 部署コード)` は重複と NULL を除いた D1、D2 の 2。NULL を1つの値として数えると 3 になり誤り。'
+    level: fe
+  - q: '社員表に (氏名, 部署コード, 給与) として、(佐藤, D1, 300)、(鈴木, D2, 250)、(高橋, D1, 200)、(田中, D3, 400)、(伊藤, D2, 350)、(渡辺, D1, 150) の 6 行がある（給与の単位は千円）。次の SQL 文の結果はどれか。`SELECT 部署コード, AVG(給与) FROM 社員 WHERE 給与 >= 200 GROUP BY 部署コード HAVING COUNT(*) >= 2`'
+    choices:
+      - 'D2 が 300 の 1 行'
+      - 'D1 が約 217、D2 が 300 の 2 行'
+      - 'D1 が 250、D2 が 300 の 2 行'
+      - 'D1 が 250、D2 が 300、D3 が 400 の 3 行'
+    answer: 2
+    explanation: 'まず `WHERE` で給与 200 未満の渡辺の行が除かれる。グループ化すると D1 が 300 と 200（2 行）、D2 が 250 と 350（2 行）、D3 が 400（1 行）。`HAVING COUNT(*) >= 2` で D3 が除かれ、平均は D1 が $\dfrac{300 + 200}{2} = 250$、D2 が $\dfrac{250 + 350}{2} = 300$。渡辺を含めて平均すると D1 は $\dfrac{650}{3} \approx 217$ になるが、`WHERE` は集約前に評価されるので誤り。'
+    level: fe
+  - q: '社員表に 4 行あり、そのうち 1 行は部署コードが部署表に存在しない値（D9）である。残り 3 行の部署コードは部署表に存在する。`SELECT 社員.氏名, 部署.部署名 FROM 社員 LEFT OUTER JOIN 部署 ON 社員.部署コード = 部署.部署コード` の結果として正しいものはどれか。'
+    choices:
+      - '3 行が返り、D9 の社員は含まれない'
+      - '4 行が返り、D9 の社員の部署名は NULL になる'
+      - '4 行が返り、D9 の社員の部署名は空文字列になる'
+      - '社員表の行数と部署表の行数の積の行が返る'
+    answer: 1
+    explanation: '左外部結合では左側（社員表）の行がすべて残り、対応する部署がない行の部署名は NULL になる。アは内部結合（`INNER JOIN`）の結果。エは結合条件を書かなかった場合の直積。'
+    level: fe
+  - q: '集約関数を使った条件「社員が 3 人以上いる部署だけ」を指定する場所として、適切なものはどれか。'
+    choices: ['`WHERE` 句', '`ORDER BY` 句', '`SELECT` 句', '`HAVING` 句']
+    answer: 3
+    explanation: '論理的な評価順序は FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY。`WHERE` は集約前の行を絞り込むため `COUNT(*)` などの集約関数は使えず、グループ化後のグループを絞り込む `HAVING COUNT(*) >= 3` と書く。'
+    level: fe
+  - q: 'SQL 文とその分類の組合せとして、適切なものはどれか。'
+    choices:
+      - '`GRANT` … DCL（データ制御言語）'
+      - '`CREATE` … DML（データ操作言語）'
+      - '`UPDATE` … DDL（データ定義言語）'
+      - '`COMMIT` … DCL（データ制御言語）'
+    answer: 0
+    explanation: '`GRANT`・`REVOKE` は権限を管理する DCL。`CREATE` は表などを定義する DDL、`UPDATE` はデータを更新する DML。`COMMIT` は更新を確定するトランザクション制御の文。'
+    level: fe
 ---
 
 SQL は関係データベースで表を定義し、データを検索・更新するための標準言語です（ISO/JIS で規格化）。

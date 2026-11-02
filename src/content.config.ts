@@ -12,6 +12,19 @@ import { examIds } from './data/exams';
  * 子を持つトピックは「ディレクトリ + index.md」、末端は単独の .md にする。
  * 図やアニメーションの部品（src/components/diagrams/）を使う記事は .mdx にする。
  */
+/** 確認問題（4択などの選択式）。問題文・選択肢・解説では $...$ の数式が使える */
+const quizItem = z
+  .object({
+    q: z.string(),
+    choices: z.array(z.string()).min(2).max(5),
+    /** 正解の選択肢の番号（0 始まり） */
+    answer: z.number().int().min(0),
+    explanation: z.string(),
+    /** この問題の難易度の目安となる試験（省略可） */
+    level: z.enum(examIds).optional(),
+  })
+  .refine((v) => v.answer < v.choices.length, { message: 'answer が choices の範囲外です' });
+
 const topics = defineCollection({
   loader: glob({
     pattern: '**/*.{md,mdx}',
@@ -33,6 +46,8 @@ const topics = defineCollection({
     draft: z.boolean().default(false),
     /** 分野のアイコン名（src/components/CategoryIcon.astro）。主に大分類の index に付ける */
     icon: z.string().optional(),
+    /** 記事末尾に表示する確認問題 */
+    quiz: z.array(quizItem).default([]),
   }),
 });
 
