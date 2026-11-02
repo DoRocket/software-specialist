@@ -1,0 +1,448 @@
+---
+/**
+ * 損益分岐点図表（利益図表）。固定費・変動費率・売上高をスライダーで動かすと、
+ * 売上高線・固定費線・総費用線（固定費 + 変動費）と損益分岐点、利益（損失）の領域が描き直され、
+ * 損益分岐点売上高・利益・安全余裕率・損益分岐点比率を式つきで表示する。
+ *
+ * 使い方（.mdx）:
+ *   <BreakEvenChart />
+ *   <BreakEvenChart fixed={300} rate={60} sales={1000} presets={[{ label: '例題', fixed: 300, rate: 60, sales: 1000 }]} />
+ * - fixed: 固定費、rate: 変動費率（%、5〜95）、sales: 現在の売上高。単位は unit（既定「万円」）
+ * - maxFixed / maxSales: スライダーの上限
+ */
+import Figure from './Figure.astro';
+
+interface Preset {
+  label: string;
+  fixed: number;
+  rate: number;
+  sales: number;
+}
+interface Props {
+  title?: string;
+  caption?: string;
+  fixed?: number;
+  rate?: number;
+  sales?: number;
+  unit?: string;
+  maxFixed?: number;
+  maxSales?: number;
+  presets?: Preset[];
+}
+const {
+  title = '損益分岐点図表（固定費・変動費率・売上高を動かす）',
+  caption,
+  fixed = 300,
+  rate = 60,
+  sales = 1000,
+  unit = '万円',
+  maxFixed = 1000,
+  maxSales = 3000,
+  presets = [],
+} = Astro.props;
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const fixedStep = maxFixed >= 500 ? 10 : 1;
+const salesStep = maxSales >= 500 ? 10 : 1;
+---
+
+<Figure title={title} caption={caption}>
+  <div class="be" data-be data-be-unit={unit} data-be-presets={JSON.stringify(presets)}>
+    <div class="be-controls">
+      <label class="be-ctl">
+        <span class="be-name">固定費</span>
+        <input type="range" min="0" max={maxFixed} step={fixedStep} value={clamp(fixed, 0, maxFixed)} data-be-in="fixed" />
+        <output class="dg-mono be-val" data-be-out="fixed"></output>
+      </label>
+      <label class="be-ctl">
+        <span class="be-name">変動費率</span>
+        <input type="range" min="5" max="95" step="1" value={clamp(rate, 5, 95)} data-be-in="rate" />
+        <output class="dg-mono be-val" data-be-out="rate"></output>
+      </label>
+      <label class="be-ctl">
+        <span class="be-name">売上高</span>
+        <input type="range" min="0" max={maxSales} step={salesStep} value={clamp(sales, 0, maxSales)} data-be-in="sales" />
+        <output class="dg-mono be-val" data-be-out="sales"></output>
+      </label>
+      {
+        presets.length > 0 && (
+          <div class="be-presets">
+            {presets.map((p, i) => (
+              <button type="button" class="dg-btn" data-be-preset={i}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+        )
+      }
+    </div>
+
+    <div class="be-layout">
+      <svg viewBox="0 0 520 380" role="img" aria-label="売上高線・総費用線・固定費線と損益分岐点の図" data-be-svg></svg>
+      <div class="be-side">
+        <div class="dg-result">
+          <div class="be-label">損益分岐点売上高 ＝ 固定費 ÷ (1 − 変動費率)</div>
+          <div class="dg-mono be-formula" data-be-bep></div>
+        </div>
+        <div class="dg-result">
+          <div class="be-label">利益 ＝ 売上高 × (1 − 変動費率) − 固定費</div>
+          <div class="dg-mono be-formula" data-be-profit></div>
+        </div>
+        <div class="dg-result">
+          <div class="be-label">安全余裕率 ＝ (売上高 − 損益分岐点売上高) ÷ 売上高</div>
+          <div class="dg-mono be-formula" data-be-safety></div>
+        </div>
+        <div class="dg-result">
+          <div class="be-label">損益分岐点比率 ＝ 損益分岐点売上高 ÷ 売上高</div>
+          <div class="dg-mono be-formula" data-be-ratio></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</Figure>
+
+<script>
+  const NS = 'http://www.w3.org/2000/svg';
+  function el(name: string, attrs: Record<string, string | number>, text?: string) {
+    const e = document.createElementNS(NS, name);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+  /** 小数第1位までに丸め、3桁区切りにする */
+  function fmt(n: number) {
+    const r = Math.round(n * 10) / 10;
+    const [i, d] = Math.abs(r).toFixed(1).split('.');
+    const s = i.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (d === '0' ? '' : `.${d}`);
+    return (r < 0 ? '−' : '') + s;
+  }
+  /** 比率（変動費率など）を小数第2位まで表示する */
+  function dec(n: number) {
+    return String(Math.round(n * 100) / 100);
+  }
+  /** 表示のために丸めたなら「≒」、そのままなら「=」 */
+  function eq(n: number) {
+    return Math.abs(n * 10 - Math.round(n * 10)) > 1e-6 ? '≒' : '=';
+  }
+  function pct(n: number) {
+    return `${fmt(n * 100)}%`;
+  }
+  /** 目盛りに使うきりのよい上限 */
+  function niceMax(v: number) {
+    if (v <= 0) return 100;
+    const p = Math.pow(10, Math.floor(Math.log10(v)));
+    for (const m of [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p;
+    return 10 * p;
+  }
+
+  interface Preset {
+    label: string;
+    fixed: number;
+    rate: number;
+    sales: number;
+  }
+
+  function init(root: HTMLElement) {
+    const unit = root.dataset.beUnit ?? '';
+    const presets: Preset[] = JSON.parse(root.dataset.bePresets ?? '[]');
+    const input = (k: string) => root.querySelector<HTMLInputElement>(`[data-be-in="${k}"]`)!;
+    const out = (k: string) => root.querySelector<HTMLElement>(`[data-be-out="${k}"]`)!;
+    const svg = root.querySelector<SVGSVGElement>('[data-be-svg]')!;
+    const q = (s: string) => root.querySelector<HTMLElement>(s)!;
+
+    const W = 520;
+    const H = 380;
+    const m = { l: 62, r: 26, t: 14, b: 44 };
+    const pw = W - m.l - m.r;
+    const ph = H - m.t - m.b;
+
+    const update = () => {
+      const F = Number(input('fixed').value);
+      const rate = Number(input('rate').value);
+      const v = rate / 100;
+      const S = Number(input('sales').value);
+      out('fixed').textContent = `${fmt(F)}${unit}`;
+      out('rate').textContent = `${rate}%`;
+      out('sales').textContent = `${fmt(S)}${unit}`;
+
+      const mr = 1 - v; // 限界利益率
+      const bep = F / mr;
+      const max = niceMax(Math.max(S, bep, F, 1) * 1.15);
+      const X = (x: number) => m.l + (x / max) * pw;
+      const Y = (y: number) => m.t + ph - (Math.min(y, max) / max) * ph;
+      /** 総費用線が上端に届く売上高（そこで線を止める） */
+      const costAt = (x: number) => F + v * x;
+      const xCostTop = Math.min(max, (max - F) / v);
+
+      svg.replaceChildren();
+      // 目盛りと格子
+      const ticks = 5;
+      for (let i = 0; i <= ticks; i++) {
+        const t = (max / ticks) * i;
+        svg.append(el('line', { x1: X(0), y1: Y(t), x2: X(max), y2: Y(t), class: 'be-grid' }));
+        svg.append(el('line', { x1: X(t), y1: Y(0), x2: X(t), y2: Y(max), class: 'be-grid' }));
+        svg.append(el('text', { x: m.l - 6, y: Y(t) + 4, 'text-anchor': 'end', class: 'be-tick' }, fmt(t)));
+        svg.append(el('text', { x: X(t), y: H - m.b + 16, 'text-anchor': 'middle', class: 'be-tick' }, fmt(t)));
+      }
+      svg.append(el('line', { x1: X(0), y1: Y(0), x2: X(max), y2: Y(0), class: 'be-axis' }));
+      svg.append(el('line', { x1: X(0), y1: Y(0), x2: X(0), y2: Y(max), class: 'be-axis' }));
+      svg.append(el('text', { x: X(max), y: H - 6, 'text-anchor': 'end', class: 'be-axis-label' }, `売上高（${unit}）`));
+      svg.append(el('text', { x: 6, y: m.t + 4, class: 'be-axis-label', transform: `rotate(90 6 ${m.t + 4})` }, `金額（${unit}）`));
+
+      // 損失の領域（0〜損益分岐点、総費用線と売上高線の間）と利益の領域
+      if (bep > 0 && bep < max) {
+        svg.append(
+          el('polygon', {
+            points: `${X(0)},${Y(0)} ${X(0)},${Y(F)} ${X(bep)},${Y(bep)}`,
+            class: 'be-loss',
+          }),
+        );
+      }
+      if (bep < max) {
+        const pts: string[] = [`${X(bep)},${Y(bep)}`, `${X(max)},${Y(max)}`];
+        if (costAt(max) <= max) pts.push(`${X(max)},${Y(costAt(max))}`);
+        else pts.push(`${X(xCostTop)},${Y(max)}`);
+        svg.append(el('polygon', { points: pts.join(' '), class: 'be-gain' }));
+      }
+
+      // 線: 固定費線、総費用線、売上高線
+      svg.append(el('line', { x1: X(0), y1: Y(F), x2: X(max), y2: Y(F), class: 'be-line be-fixed' }));
+      svg.append(el('line', { x1: X(0), y1: Y(F), x2: X(xCostTop), y2: Y(costAt(xCostTop)), class: 'be-line be-cost' }));
+      svg.append(el('line', { x1: X(0), y1: Y(0), x2: X(max), y2: Y(max), class: 'be-line be-sales' }));
+
+      // 線の名前（右端付近）。重ならないように縦にずらす
+      const labels = [
+        { y: Y(max) + 14, text: '売上高線', cls: 'be-t-sales', x: X(max) - 28 },
+        { y: Y(costAt(xCostTop)) + (costAt(max) > max ? 14 : -6), text: '総費用線', cls: 'be-t-cost', x: X(xCostTop) - 4 },
+        { y: Y(F) - 6, text: '固定費線', cls: 'be-t-fixed', x: X(max) - 4 },
+      ];
+      labels.sort((a, b) => a.y - b.y);
+      for (let i = 1; i < labels.length; i++) {
+        if (labels[i].y - labels[i - 1].y < 15) labels[i].y = labels[i - 1].y + 15;
+      }
+      for (const lb of labels) {
+        svg.append(el('text', { x: lb.x, y: Math.min(lb.y, Y(0) - 4), 'text-anchor': 'end', class: `be-line-label ${lb.cls}` }, lb.text));
+      }
+
+      // 現在の売上高
+      if (S > 0) {
+        const cost = costAt(S);
+        svg.append(el('line', { x1: X(S), y1: Y(0), x2: X(S), y2: Y(Math.max(S, cost)), class: 'be-now' }));
+        svg.append(el('circle', { cx: X(S), cy: Y(S), r: 4, class: 'be-dot-sales' }));
+        if (cost <= max) svg.append(el('circle', { cx: X(S), cy: Y(cost), r: 4, class: 'be-dot-cost' }));
+        const profit = S * mr - F;
+        const midY = (Y(S) + Y(Math.min(cost, max))) / 2;
+        const right = X(S) < m.l + pw * 0.62;
+        svg.append(
+          el(
+            'text',
+            { x: X(S) + (right ? 8 : -8), y: midY + 4, 'text-anchor': right ? 'start' : 'end', class: profit >= 0 ? 'be-t-gain' : 'be-t-loss' },
+            profit >= 0 ? `利益 ${fmt(profit)}` : `損失 ${fmt(-profit)}`,
+          ),
+        );
+      }
+
+      // 損益分岐点
+      if (bep <= max) {
+        svg.append(el('line', { x1: X(bep), y1: Y(bep), x2: X(bep), y2: Y(0), class: 'be-guide' }));
+        svg.append(el('circle', { cx: X(bep), cy: Y(bep), r: 6, class: 'be-bep' }));
+        // 名前は点の下（総費用線と固定費線の間の空いた所）に置き、現在の売上高の利益表示と重ならないようにする
+        const leftSide = X(bep) > m.l + pw * 0.6;
+        svg.append(
+          el(
+            'text',
+            { x: X(bep) + (leftSide ? -10 : 10), y: Y(bep) + 24, 'text-anchor': leftSide ? 'end' : 'start', class: 'be-bep-label' },
+            `損益分岐点 ${fmt(bep)}`,
+          ),
+        );
+      }
+
+      // 式
+      q('[data-be-bep]').textContent = `${fmt(F)} ÷ (1 − ${dec(v)}) = ${fmt(F)} ÷ ${dec(mr)} ${eq(bep)} ${fmt(bep)}${unit}`;
+      const profit = S * mr - F;
+      q('[data-be-profit]').textContent =
+        `${fmt(S)} × ${dec(mr)} − ${fmt(F)} = ${fmt(S * mr)} − ${fmt(F)} = ${fmt(profit)}${unit}` + (profit < 0 ? '（損失）' : '');
+      if (S > 0) {
+        const safety = (S - bep) / S;
+        q('[data-be-safety]').textContent =
+          `(${fmt(S)} − ${fmt(bep)}) ÷ ${fmt(S)} ${eq(safety * 100)} ${pct(safety)}` + (safety < 0 ? '（損益分岐点を下回っている）' : '');
+        q('[data-be-ratio]').textContent = `${fmt(bep)} ÷ ${fmt(S)} ${eq((bep / S) * 100)} ${pct(bep / S)}`;
+      } else {
+        q('[data-be-safety]').textContent = '売上高が 0 のため計算できません';
+        q('[data-be-ratio]').textContent = '売上高が 0 のため計算できません';
+      }
+    };
+
+    for (const k of ['fixed', 'rate', 'sales']) input(k).addEventListener('input', update);
+    root.querySelectorAll<HTMLButtonElement>('[data-be-preset]').forEach((b) => {
+      b.addEventListener('click', () => {
+        const p = presets[Number(b.dataset.bePreset)];
+        input('fixed').value = String(p.fixed);
+        input('rate').value = String(p.rate);
+        input('sales').value = String(p.sales);
+        update();
+      });
+    });
+    update();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-be]').forEach(init);
+</script>
+
+<style>
+  .be-controls {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+  }
+  .be-ctl {
+    display: grid;
+    grid-template-columns: 5.5em minmax(0, 1fr) 6.5em;
+    align-items: center;
+    gap: 8px;
+  }
+  .be-name {
+    font-weight: 700;
+  }
+  .be-ctl input[type='range'] {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    accent-color: var(--accent);
+  }
+  .be-val {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+  .be-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .be-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 12px 16px;
+    align-items: start;
+  }
+  @media (max-width: 720px) {
+    .be-layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  .be-side {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+  }
+  .be-label {
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+  .be-formula {
+    margin-top: 2px;
+    font-size: 0.88rem;
+    overflow-wrap: anywhere;
+  }
+  .be :global(svg .be-grid) {
+    stroke: var(--border);
+    stroke-width: 1;
+  }
+  .be :global(svg .be-axis) {
+    stroke: var(--fg-muted);
+    stroke-width: 1.5;
+  }
+  .be :global(svg text.be-tick) {
+    font-size: 12px;
+    fill: var(--fg-muted);
+  }
+  .be :global(svg text.be-axis-label) {
+    font-size: 12px;
+    fill: var(--fg-muted);
+  }
+  .be :global(svg .be-loss) {
+    fill: var(--dg-warn);
+    opacity: 0.16;
+  }
+  .be :global(svg .be-gain) {
+    fill: var(--dg-ok);
+    opacity: 0.18;
+  }
+  .be :global(svg .be-line) {
+    stroke-width: 2.5;
+  }
+  .be :global(svg .be-sales) {
+    stroke: var(--dg-c2);
+  }
+  .be :global(svg .be-cost) {
+    stroke: var(--dg-c1);
+  }
+  .be :global(svg .be-fixed) {
+    stroke: var(--dg-c4);
+    stroke-dasharray: 6 4;
+  }
+  .be :global(svg text.be-line-label) {
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .be :global(svg text.be-t-sales) {
+    fill: var(--dg-c2);
+  }
+  .be :global(svg text.be-t-cost) {
+    fill: var(--dg-c1);
+  }
+  .be :global(svg text.be-t-fixed) {
+    fill: var(--dg-c4);
+  }
+  .be :global(svg .be-now) {
+    stroke: var(--fg-muted);
+    stroke-width: 1.5;
+    stroke-dasharray: 3 3;
+  }
+  .be :global(svg .be-dot-sales) {
+    fill: var(--dg-c2);
+  }
+  .be :global(svg .be-dot-cost) {
+    fill: var(--dg-c1);
+  }
+  .be :global(svg .be-guide) {
+    stroke: var(--accent);
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+  }
+  .be :global(svg .be-bep) {
+    fill: var(--bg);
+    stroke: var(--accent);
+    stroke-width: 3;
+  }
+  .be :global(svg text.be-bep-label) {
+    font-size: 13px;
+    font-weight: 700;
+    fill: var(--accent);
+  }
+  .be :global(svg text.be-t-gain) {
+    font-size: 13px;
+    font-weight: 700;
+    fill: var(--dg-ok);
+  }
+  .be :global(svg text.be-t-loss) {
+    font-size: 13px;
+    font-weight: 700;
+    fill: var(--dg-warn);
+  }
+  /* スマートフォンでは図が縮小されるので、文字を大きめにする */
+  @media (max-width: 560px) {
+    .be :global(svg text.be-tick),
+    .be :global(svg text.be-axis-label) {
+      font-size: 16px;
+    }
+    .be :global(svg text.be-line-label),
+    .be :global(svg text.be-bep-label),
+    .be :global(svg text.be-t-gain),
+    .be :global(svg text.be-t-loss) {
+      font-size: 18px;
+    }
+  }
+</style>
