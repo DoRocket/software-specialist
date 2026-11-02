@@ -20,7 +20,7 @@ const tree = await getTopicTree();
             <span class={`exam-badge exam-${e.id}`}>{e.short}</span>
             {e.name}
             <span class="muted">
-              （ITSS レベル{e.level}・{tree.flat.filter((n) => n.entry.data.exams.includes(e.id)).length} トピック）
+              （{e.note}・{tree.flat.filter((n) => n.entry.data.exams.includes(e.id)).length} トピック）
             </span>
           </a>
         </li>

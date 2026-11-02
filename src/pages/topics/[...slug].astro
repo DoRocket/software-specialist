@@ -21,6 +21,7 @@ const { Content } = await render(node.entry);
 const crumbs = ancestry(node).slice(0, -1);
 const icon = ancestry(node)[0].entry.data.icon;
 const related = d.related.map((r) => tree.byId.get(r)!);
+const prerequisites = d.prerequisites.map((r) => tree.byId.get(r)!);
 const index = tree.flat.indexOf(node);
 const prev = tree.flat[index - 1];
 const next = tree.flat[index + 1];
@@ -57,11 +58,27 @@ const next = tree.flat[index + 1];
       このトピックは、選択中の試験範囲には含まれていません（参考として表示しています）。
     </p>
 
+    {
+      prerequisites.length > 0 && (
+        <aside class="prereq" aria-label="前提知識">
+          <span class="prereq-label">この記事の前に</span>
+          <ul>
+            {prerequisites.map((r) => (
+              <li>
+                <a href={topicUrl(r.id)}>{r.entry.data.title}</a>
+                {r.entry.data.summary && <span class="prereq-summary">… {r.entry.data.summary}</span>}
+              </li>
+            ))}
+          </ul>
+        </aside>
+      )
+    }
+
     <div class="prose">
       <Content />
     </div>
 
-    <Quiz items={d.quiz} />
+    <Quiz items={d.quiz} topicId={id} />
 
     {
       node.children.length > 0 && (

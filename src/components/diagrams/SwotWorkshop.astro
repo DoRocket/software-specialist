@@ -1,0 +1,503 @@
+---
+/**
+ * SWOT 分析とクロス SWOT のワークシート。4象限（強み・弱み・機会・脅威）に項目を追加・削除でき、
+ * クロス SWOT の4つの欄（SO・ST・WO・WT）では、入力済みの項目から組合せの問いかけ（ヒント）を順に表示する。
+ * 戦略の選択肢も各欄に書き込める。内容はこのブラウザの localStorage にだけ保存する（失敗しても動作は続ける）。
+ *
+ * 使い方（.mdx）:
+ *   <SwotWorkshop />
+ *   <SwotWorkshop storageKey="yoyakuru" initial={{ s: ['…'], w: ['…'], o: ['…'], t: ['…'] }} />
+ * - initial は最初に表示する例（「例に戻す」でこの内容に戻る）。so / st / wo / wt も指定できる
+ * - storageKey は保存の区別に使う名前（同じページに複数置く場合は別の名前にする）
+ */
+import Figure from './Figure.astro';
+
+type ListKey = 's' | 'w' | 'o' | 't' | 'so' | 'st' | 'wo' | 'wt';
+interface Props {
+  title?: string;
+  caption?: string;
+  storageKey?: string;
+  initial?: Partial<Record<ListKey, string[]>>;
+}
+const { title = 'SWOT・クロス SWOT ワークシート', caption, storageKey = 'default', initial = {} } = Astro.props;
+
+const quads: { key: ListKey; name: string; en: string; sub: string; ph: string }[] = [
+  { key: 's', name: '強み', en: 'Strengths', sub: '内部 × プラス', ph: '例: 導入後の訪問サポートが手厚い' },
+  { key: 'w', name: '弱み', en: 'Weaknesses', sub: '内部 × マイナス', ph: '例: 営業が地元の県内に限られる' },
+  { key: 'o', name: '機会', en: 'Opportunities', sub: '外部 × プラス', ph: '例: 人手不足で省力化の需要が高まる' },
+  { key: 't', name: '脅威', en: 'Threats', sub: '外部 × マイナス', ph: '例: 大手が低価格プランを投入' },
+];
+const crosses: { key: ListKey; name: string; a: ListKey; b: ListKey; q: string }[] = [
+  { key: 'so', name: 'SO（強み × 機会）', a: 's', b: 'o', q: '強みを生かして機会をつかむ（積極的に攻める）' },
+  { key: 'st', name: 'ST（強み × 脅威）', a: 's', b: 't', q: '強みで脅威をかわす・他社と差別化する' },
+  { key: 'wo', name: 'WO（弱み × 機会）', a: 'w', b: 'o', q: '弱みを補って機会を逃さない（提携・投資・段階的に）' },
+  { key: 'wt', name: 'WT（弱み × 脅威）', a: 'w', b: 't', q: '最悪の事態を避ける（守り・縮小・撤退）' },
+];
+---
+
+<Figure title={title} caption={caption}>
+  <div class="sw" data-sw data-sw-key={storageKey} data-sw-initial={JSON.stringify(initial)}>
+    <p class="sw-note">項目は追加・削除できます。入力した内容はこのブラウザの中にだけ保存され、外部には送信されません。</p>
+
+    <div class="sw-axes" aria-hidden="true">
+      <span>プラス要因</span><span>マイナス要因</span>
+    </div>
+    <div class="sw-grid">
+      <span class="sw-side" aria-hidden="true">内部環境<small>（自社で変えられる）</small></span>
+      {
+        quads.slice(0, 2).map((q) => (
+          <section class={`sw-quad sw-${q.key}`}>
+            <h4 class="sw-head">
+              {q.name} <span>{q.en}</span>
+              <small>{q.sub}</small>
+            </h4>
+            <ul class="sw-list" data-sw-list={q.key} />
+            <form class="sw-form" data-sw-form={q.key}>
+              <input type="text" maxlength="80" placeholder={q.ph} aria-label={`${q.name}を追加`} />
+              <button type="submit" class="dg-btn">追加</button>
+            </form>
+          </section>
+        ))
+      }
+      <span class="sw-side" aria-hidden="true">外部環境<small>（自社では変えられない）</small></span>
+      {
+        quads.slice(2).map((q) => (
+          <section class={`sw-quad sw-${q.key}`}>
+            <h4 class="sw-head">
+              {q.name} <span>{q.en}</span>
+              <small>{q.sub}</small>
+            </h4>
+            <ul class="sw-list" data-sw-list={q.key} />
+            <form class="sw-form" data-sw-form={q.key}>
+              <input type="text" maxlength="80" placeholder={q.ph} aria-label={`${q.name}を追加`} />
+              <button type="submit" class="dg-btn">追加</button>
+            </form>
+          </section>
+        ))
+      }
+    </div>
+
+    <p class="sw-cross-title">クロス SWOT … 2つの象限の項目を掛け合わせて、戦略の選択肢を書き出す</p>
+    <div class="sw-cross">
+      {
+        crosses.map((c) => (
+          <section class={`sw-cell sw-cell-${c.key}`} data-sw-cell={c.key} data-sw-a={c.a} data-sw-b={c.b}>
+            <h4 class="sw-head">{c.name}</h4>
+            <p class="sw-q">{c.q}</p>
+            <div class="sw-hint">
+              <span class="sw-hint-label">組合せのヒント</span>
+              <span class="sw-hint-text" data-sw-hint aria-live="polite" />
+              <button type="button" class="dg-btn" data-sw-next>
+                別の組合せ ›
+              </button>
+            </div>
+            <ul class="sw-list" data-sw-list={c.key} />
+            <form class="sw-form" data-sw-form={c.key}>
+              <input type="text" maxlength="80" placeholder="戦略の選択肢を書く" aria-label={`${c.name}の戦略を追加`} />
+              <button type="submit" class="dg-btn">追加</button>
+            </form>
+          </section>
+        ))
+      }
+    </div>
+
+    <div class="dg-controls sw-actions">
+      <button type="button" class="dg-btn" data-sw-act="reset">例に戻す</button>
+      <button type="button" class="dg-btn" data-sw-act="clear">すべて消去</button>
+      <button type="button" class="dg-btn" data-sw-act="copy">テキストでコピー</button>
+      <output class="sw-status" data-sw-status></output>
+    </div>
+  </div>
+</Figure>
+
+<script>
+  type ListKey = 's' | 'w' | 'o' | 't' | 'so' | 'st' | 'wo' | 'wt';
+  type State = Record<ListKey, string[]>;
+  const KEYS: ListKey[] = ['s', 'w', 'o', 't', 'so', 'st', 'wo', 'wt'];
+  const NAMES: Record<ListKey, string> = {
+    s: '強み',
+    w: '弱み',
+    o: '機会',
+    t: '脅威',
+    so: 'SO（強み×機会）',
+    st: 'ST（強み×脅威）',
+    wo: 'WO（弱み×機会）',
+    wt: 'WT（弱み×脅威）',
+  };
+  const MAX_ITEMS = 12;
+  const MAX_LEN = 80;
+
+  const hintText = (cell: string, a: string, b: string) => {
+    switch (cell) {
+      case 'so':
+        return `強み「${a}」を生かして、機会「${b}」をつかむには？`;
+      case 'st':
+        return `強み「${a}」で、脅威「${b}」の影響をかわす・差別化するには？`;
+      case 'wo':
+        return `機会「${b}」を逃さないために、弱み「${a}」をどう補う？（提携・投資・外部の力）`;
+      default:
+        return `弱み「${a}」と脅威「${b}」が重なったときの最悪の事態をどう避ける？（守り・縮小・撤退）`;
+    }
+  };
+
+  function normalize(v: unknown): State {
+    const out = Object.fromEntries(KEYS.map((k) => [k, [] as string[]])) as State;
+    if (v && typeof v === 'object') {
+      for (const k of KEYS) {
+        const arr = (v as Record<string, unknown>)[k];
+        if (Array.isArray(arr)) {
+          out[k] = arr
+            .filter((x): x is string => typeof x === 'string')
+            .map((x) => x.trim().slice(0, MAX_LEN))
+            .filter(Boolean)
+            .slice(0, MAX_ITEMS);
+        }
+      }
+    }
+    return out;
+  }
+
+  function init(root: HTMLElement) {
+    const storageId = `swot-workshop:v1:${root.dataset.swKey ?? 'default'}`;
+    let initial: State;
+    try {
+      initial = normalize(JSON.parse(root.dataset.swInitial ?? '{}'));
+    } catch {
+      initial = normalize({});
+    }
+
+    let state: State = normalize(initial);
+    try {
+      const saved = localStorage.getItem(storageId);
+      if (saved) state = normalize(JSON.parse(saved));
+    } catch {
+      /* 保存領域が使えない環境では例の内容で動かす */
+    }
+
+    const status = root.querySelector<HTMLElement>('[data-sw-status]')!;
+    const hintIndex: Record<string, number> = {};
+
+    const save = () => {
+      try {
+        localStorage.setItem(storageId, JSON.stringify(state));
+      } catch {
+        /* 保存できなくても画面上の操作は続けられる */
+      }
+    };
+
+    const renderList = (key: ListKey) => {
+      const ul = root.querySelector<HTMLUListElement>(`[data-sw-list="${key}"]`);
+      if (!ul) return;
+      ul.replaceChildren();
+      state[key].forEach((text, i) => {
+        const li = document.createElement('li');
+        const span = document.createElement('span');
+        span.textContent = text;
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'sw-del';
+        del.textContent = '×';
+        del.setAttribute('aria-label', `「${text}」を削除`);
+        del.addEventListener('click', () => {
+          state[key].splice(i, 1);
+          save();
+          render();
+        });
+        li.append(span, del);
+        ul.append(li);
+      });
+      if (state[key].length === 0) {
+        const li = document.createElement('li');
+        li.className = 'sw-empty';
+        li.textContent = '（まだ項目がありません）';
+        ul.append(li);
+      }
+      const form = root.querySelector<HTMLFormElement>(`[data-sw-form="${key}"]`);
+      const full = state[key].length >= MAX_ITEMS;
+      form?.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button').forEach((e) => (e.disabled = full));
+    };
+
+    const renderHints = () => {
+      root.querySelectorAll<HTMLElement>('[data-sw-cell]').forEach((cell) => {
+        const key = cell.dataset.swCell!;
+        const as = state[cell.dataset.swA as ListKey];
+        const bs = state[cell.dataset.swB as ListKey];
+        const text = cell.querySelector<HTMLElement>('[data-sw-hint]')!;
+        const next = cell.querySelector<HTMLButtonElement>('[data-sw-next]')!;
+        const total = as.length * bs.length;
+        if (total === 0) {
+          text.textContent = `${NAMES[cell.dataset.swA as ListKey]}と${NAMES[cell.dataset.swB as ListKey]}を1つ以上入れると、組合せの問いかけが表示されます。`;
+          next.disabled = true;
+          return;
+        }
+        const k = (hintIndex[key] ?? 0) % total;
+        const a = as[k % as.length];
+        const b = bs[Math.floor(k / as.length) % bs.length];
+        text.textContent = `${hintText(key, a, b)}（${k + 1} / ${total}）`;
+        next.disabled = total < 2;
+      });
+    };
+
+    const render = () => {
+      KEYS.forEach(renderList);
+      renderHints();
+    };
+
+    root.querySelectorAll<HTMLFormElement>('[data-sw-form]').forEach((form) => {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const key = form.dataset.swForm as ListKey;
+        const input = form.querySelector<HTMLInputElement>('input')!;
+        const v = input.value.trim().slice(0, MAX_LEN);
+        if (!v || state[key].length >= MAX_ITEMS) return;
+        state[key].push(v);
+        input.value = '';
+        save();
+        render();
+        input.focus();
+      });
+    });
+
+    root.querySelectorAll<HTMLElement>('[data-sw-cell]').forEach((cell) => {
+      cell.querySelector<HTMLButtonElement>('[data-sw-next]')!.addEventListener('click', () => {
+        const key = cell.dataset.swCell!;
+        hintIndex[key] = (hintIndex[key] ?? 0) + 1;
+        renderHints();
+      });
+    });
+
+    root.querySelector('[data-sw-act="reset"]')!.addEventListener('click', () => {
+      state = normalize(initial);
+      save();
+      render();
+      status.textContent = '例の内容に戻しました';
+    });
+    root.querySelector('[data-sw-act="clear"]')!.addEventListener('click', () => {
+      state = normalize({});
+      save();
+      render();
+      status.textContent = 'すべての項目を消去しました';
+    });
+    root.querySelector('[data-sw-act="copy"]')!.addEventListener('click', async () => {
+      const text = KEYS.map((k) => `【${NAMES[k]}】\n${state[k].map((x) => `- ${x}`).join('\n') || '- （なし）'}`).join('\n\n');
+      try {
+        await navigator.clipboard.writeText(text);
+        status.textContent = 'クリップボードにコピーしました';
+      } catch {
+        status.textContent = 'この環境ではコピーできませんでした';
+      }
+    });
+
+    render();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-sw]').forEach(init);
+</script>
+
+<style>
+  .sw {
+    font-size: 0.9rem;
+  }
+  .sw-note {
+    margin: 0 0 10px;
+    font-size: 0.82rem;
+    color: var(--fg-muted);
+  }
+  .sw-axes,
+  .sw-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+  .sw-axes {
+    margin-bottom: 4px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--fg-muted);
+    text-align: center;
+  }
+  .sw-side {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--fg-muted);
+  }
+  .sw-side small {
+    font-weight: 400;
+  }
+  .sw-quad,
+  .sw-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--c, var(--dg-stroke));
+    border-radius: 8px;
+    background: var(--bg);
+    min-width: 0;
+  }
+  .sw-s {
+    --c: var(--dg-c2);
+  }
+  .sw-w {
+    --c: var(--dg-c4);
+  }
+  .sw-o {
+    --c: var(--dg-c1);
+  }
+  .sw-t {
+    --c: var(--dg-c3);
+  }
+  .sw-cell-so {
+    --c: var(--dg-c2);
+  }
+  .sw-cell-st {
+    --c: var(--dg-c5);
+  }
+  .sw-cell-wo {
+    --c: var(--dg-c1);
+  }
+  .sw-cell-wt {
+    --c: var(--dg-c4);
+  }
+  .sw-head {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+  .sw-head span {
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+  .sw-head small {
+    display: block;
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+  }
+  .sw-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 4px;
+  }
+  .sw-list :global(li) {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 0;
+    padding: 4px 6px 4px 8px;
+    border-radius: 6px;
+    background: var(--bg-subtle);
+    line-height: 1.5;
+  }
+  .sw-list :global(li span) {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .sw-list :global(li.sw-empty) {
+    background: none;
+    color: var(--fg-muted);
+    font-size: 0.8rem;
+  }
+  .sw-list :global(.sw-del) {
+    flex: none;
+    width: 1.6em;
+    height: 1.6em;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--bg);
+    color: var(--fg-muted);
+    font: inherit;
+    font-size: 0.8rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .sw-list :global(.sw-del:hover) {
+    color: var(--dg-warn);
+    border-color: var(--dg-warn);
+  }
+  .sw-form {
+    display: flex;
+    gap: 6px;
+    margin-top: auto;
+  }
+  .sw-form input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 0.85rem;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+  }
+  .sw-form button {
+    flex: none;
+  }
+  .sw-form :disabled {
+    opacity: 0.5;
+  }
+  .sw-cross-title {
+    margin: 16px 0 8px;
+    font-weight: 700;
+  }
+  .sw-cross {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .sw-q {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--fg-muted);
+  }
+  .sw-hint {
+    display: grid;
+    gap: 4px;
+    padding: 6px 8px;
+    border: 1px dashed var(--c);
+    border-radius: 6px;
+    font-size: 0.82rem;
+    line-height: 1.55;
+  }
+  .sw-hint-label {
+    font-weight: 700;
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+  }
+  .sw-hint-text {
+    overflow-wrap: anywhere;
+  }
+  .sw-hint button {
+    justify-self: start;
+  }
+  .sw-hint button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .sw-actions {
+    margin: 12px 0 0;
+  }
+  .sw-status {
+    font-size: 0.82rem;
+    color: var(--fg-muted);
+  }
+  @media (max-width: 640px) {
+    .sw-axes {
+      display: none;
+    }
+    .sw-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .sw-cross {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

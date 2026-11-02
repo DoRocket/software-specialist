@@ -86,6 +86,13 @@ import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.ast
 | `IncidentFlow` | インシデント発生 → サービスデスク → エスカレーション → 回避策で回復 → 問題管理（根本原因・既知の誤り）→ 変更管理（RFC）をステップ再生。HTML の箱で組むので狭い画面でも読める（props: example） |
 | `RecoveryTimeline` | 最後のバックアップ → 障害発生 → 業務再開 の時間軸で、失うデータ（RPO と比べる）と停止時間（RTO と比べる）をステップ再生（props: backup, failure, recovery） |
 | `CommunicationPaths` | 人数スライダーで円周上の人と全員の組合せの線が増減し、経路数 n(n−1)/2 を式つきで表示。増分（n−1 本）を強調し、リーダー経由の n−1 本と比較（props: n, max） |
+| `StrategyFlowMap` | 分析フレームワークの地図。外部環境 → 内部環境 → 統合 → 戦略立案 → 目標・評価 の5段階に、問い・使う手法・得られるものを並べた静的な図（props: highlight） |
+| `FiveForcesDiagram` | ファイブフォース分析の図。notes で事例の評価（強い／中程度／弱い）と根拠を色付きで表示（props: notes） |
+| `ValueChainDiagram` | バリューチェーンの図（支援活動・主活動・マージン）。活動名を業種に合わせて置換でき、marks で強み・弱みを色分け（props: supports, primaries, marks） |
+| `SwotWorkshop` | SWOT・クロス SWOT のワークシート。項目の追加・削除、組合せの問いかけ、テキストでコピー。内容は localStorage にだけ保存（props: initial, storageKey） |
+| `PpmMatrix` | 事業ごとの市場成長率・シェア・売上高から相対的市場シェアを計算し、4象限に円で配置。境界の変更・事業の追加が可（props: businesses, growthLine, salesUnit） |
+| `JournalToLedger` | 仕訳 → 総勘定元帳（T字勘定）への転記 → 残高試算表 をステップ再生。貸借不一致や未定義の科目はビルドエラー（props: accounts, entries, interval） |
+| `BreakEvenChart` | 固定費・変動費率・売上高のスライダーで、売上高線・総費用線・損益分岐点・利益／損失の領域を描き直し、損益分岐点売上高・安全余裕率などを式つきで表示（props: fixed, rate, sales, unit, maxFixed, maxSales, presets） |
 
 部品を追加したらこの表に追記してください。
 

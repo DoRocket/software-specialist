@@ -43,6 +43,8 @@ const topics = defineCollection({
     tags: z.array(z.string()).default([]),
     /** 関連トピックの id（例: network/ip/routing） */
     related: z.array(z.string()).default([]),
+    /** この記事を読む前に理解しておきたいトピックの id（記事の冒頭に案内を出す） */
+    prerequisites: z.array(z.string()).default([]),
     draft: z.boolean().default(false),
     /** 分野のアイコン名（src/components/CategoryIcon.astro）。主に大分類の index に付ける */
     icon: z.string().optional(),

@@ -3,9 +3,10 @@
  * 記事末尾の確認問題。フロントマターの quiz から描画する。
  * 選択肢を選ぶとその場で正誤と解説を表示し、正答数を数える（「もう一度」でリセット）。
  * 問題文・選択肢・解説では $...$ の数式と `コード` が使える（ビルド時に描画）。
+ * 解答はトピック id ごとにブラウザへ記録し（src/scripts/progress.ts）、見出しの横に前回の結果を出す。
  */
-import katex from 'katex';
 import { examById, type ExamId } from '../data/exams';
+import { CHOICE_LABELS, rich } from '../lib/rich';
 
 interface QuizItem {
   q: string;
@@ -16,40 +17,24 @@ interface QuizItem {
 }
 interface Props {
   items: QuizItem[];
+  /** 記録に使うトピック id */
+  topicId: string;
 }
-const { items } = Astro.props;
+const { items, topicId } = Astro.props;
 
-const LABELS = ['ア', 'イ', 'ウ', 'エ', 'オ'];
-
-const escapeHtml = (s: string) =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-/** $数式$ と `コード` を HTML にする。それ以外はエスケープしたテキスト */
-function rich(text: string): string {
-  return text
-    .split(/(\$[^$]+\$|`[^`]+`)/g)
-    .map((part) => {
-      if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
-        return katex.renderToString(part.slice(1, -1), { throwOnError: false, strict: 'ignore', output: 'html' });
-      }
-      if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
-        return `<code>${escapeHtml(part.slice(1, -1))}</code>`;
-      }
-      return escapeHtml(part).replace(/\n/g, '<br>');
-    })
-    .join('');
-}
+const LABELS = CHOICE_LABELS;
 ---
 
 {
   items.length > 0 && (
-    <section class="quiz" data-quiz aria-labelledby="quiz-heading">
+    <section class="quiz" data-quiz data-topic-id={topicId} aria-labelledby="quiz-heading">
       <div class="quiz-head">
         <h2 id="quiz-heading">確認問題</h2>
         <span class="quiz-score" data-quiz-score aria-live="polite">
           全 {items.length} 問
         </span>
       </div>
+      <p class="quiz-history" data-quiz-history hidden />
       <ol class="quiz-list">
         {items.map((item, i) => (
           <li class="quiz-item" data-quiz-item data-answer={item.answer}>
@@ -86,10 +71,21 @@ function rich(text: string): string {
 }
 
 <script>
+  import { loadProgress, recordAnswer, summarize } from '../scripts/progress';
+
   for (const quiz of document.querySelectorAll<HTMLElement>('[data-quiz]')) {
     const items = [...quiz.querySelectorAll<HTMLElement>('[data-quiz-item]')];
     const score = quiz.querySelector<HTMLElement>('[data-quiz-score]')!;
     const reset = quiz.querySelector<HTMLButtonElement>('[data-quiz-reset]')!;
+    const topicId = quiz.dataset.topicId!;
+
+    // 前回までの記録（最新の正誤）を見出しの下に出す
+    const history = quiz.querySelector<HTMLElement>('[data-quiz-history]')!;
+    const past = summarize(loadProgress()[topicId], items.length);
+    if (past.answered > 0) {
+      history.textContent = `前回までの記録: ${past.answered} / ${items.length} 問に解答、うち ${past.correct} 問正解`;
+      history.hidden = false;
+    }
 
     const update = () => {
       const answered = items.filter((it) => it.dataset.state);
@@ -115,6 +111,7 @@ function rich(text: string): string {
           buttons[answer].classList.add('is-correct');
           for (const b of buttons) b.setAttribute('aria-disabled', 'true');
           verdict.textContent = ok ? '◯ 正解！' : '✕ 不正解';
+          recordAnswer(topicId, items.indexOf(item), ok);
           explain.hidden = false;
           update();
         });
@@ -157,6 +154,11 @@ function rich(text: string): string {
   }
   .quiz-score {
     font-size: 0.85rem;
+    color: var(--fg-muted);
+  }
+  .quiz-history {
+    margin: 4px 0 0;
+    font-size: 0.82rem;
     color: var(--fg-muted);
   }
   .quiz-list {

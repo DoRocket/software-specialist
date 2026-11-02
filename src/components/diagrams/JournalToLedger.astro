@@ -1,0 +1,438 @@
+---
+/**
+ * 仕訳 → 総勘定元帳（T字勘定）への転記 → 残高試算表 の流れをステップ再生で見せる。
+ * 1 ステップごとに 1 つの取引の仕訳を表示し、その金額が各勘定の借方・貸方に書き写される。
+ * 最後のステップで各勘定の残高と残高試算表を表示し、借方合計と貸方合計の一致を示す。
+ * 金額の集計はビルド時に行う（貸借が一致しない仕訳や、未定義の勘定科目はビルドエラー）。
+ *
+ * 使い方（.mdx）:
+ *   <JournalToLedger />                         … 既定の例（珈琲豆店の4月の10取引）
+ *   <JournalToLedger accounts={[...]} entries={[...]} />
+ * - accounts: { name, kind }（kind は asset / liability / equity / revenue / expense）。この順に元帳と試算表に並ぶ
+ * - entries: { date, text, debit: [{ account, amount }], credit: [{ account, amount }] }
+ */
+import Figure from './Figure.astro';
+
+type Kind = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+interface Account {
+  name: string;
+  kind: Kind;
+}
+interface Line {
+  account: string;
+  amount: number;
+}
+interface Entry {
+  date: string;
+  text: string;
+  debit: Line[];
+  credit: Line[];
+}
+interface Props {
+  title?: string;
+  caption?: string;
+  accounts?: Account[];
+  entries?: Entry[];
+  /** 自動再生の間隔（ミリ秒） */
+  interval?: number;
+}
+
+const defaultAccounts: Account[] = [
+  { name: '現金', kind: 'asset' },
+  { name: '売掛金', kind: 'asset' },
+  { name: '備品', kind: 'asset' },
+  { name: '買掛金', kind: 'liability' },
+  { name: '借入金', kind: 'liability' },
+  { name: '資本金', kind: 'equity' },
+  { name: '売上', kind: 'revenue' },
+  { name: '仕入', kind: 'expense' },
+  { name: '給料', kind: 'expense' },
+  { name: '支払家賃', kind: 'expense' },
+  { name: '支払利息', kind: 'expense' },
+];
+const L = (account: string, amount: number): Line => ({ account, amount });
+const defaultEntries: Entry[] = [
+  { date: '4/1', text: '株式を発行し、現金 3,000,000円の出資を受けた', debit: [L('現金', 3000000)], credit: [L('資本金', 3000000)] },
+  { date: '4/2', text: '銀行から現金 1,000,000円を借り入れた', debit: [L('現金', 1000000)], credit: [L('借入金', 1000000)] },
+  { date: '4/3', text: '備品 800,000円を現金で購入した', debit: [L('備品', 800000)], credit: [L('現金', 800000)] },
+  { date: '4/6', text: '商品 400,000円を掛けで仕入れた', debit: [L('仕入', 400000)], credit: [L('買掛金', 400000)] },
+  {
+    date: '4/10',
+    text: '商品を 300,000円で売り上げ、100,000円は現金、残りは掛けとした',
+    debit: [L('現金', 100000), L('売掛金', 200000)],
+    credit: [L('売上', 300000)],
+  },
+  { date: '4/20', text: '売掛金 150,000円を現金で回収した', debit: [L('現金', 150000)], credit: [L('売掛金', 150000)] },
+  { date: '4/25', text: '給料 120,000円を現金で支払った', debit: [L('給料', 120000)], credit: [L('現金', 120000)] },
+  { date: '4/25', text: '家賃 80,000円を現金で支払った', debit: [L('支払家賃', 80000)], credit: [L('現金', 80000)] },
+  { date: '4/30', text: '買掛金 250,000円を現金で支払った', debit: [L('買掛金', 250000)], credit: [L('現金', 250000)] },
+  {
+    date: '4/30',
+    text: '借入金 100,000円を利息 5,000円とともに現金で返済した',
+    debit: [L('借入金', 100000), L('支払利息', 5000)],
+    credit: [L('現金', 105000)],
+  },
+];
+
+const {
+  title = '仕訳 → 総勘定元帳（T字勘定）→ 残高試算表',
+  caption,
+  accounts = defaultAccounts,
+  entries = defaultEntries,
+  interval = 3600,
+} = Astro.props;
+
+const yen = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const kindLabel: Record<Kind, string> = { asset: '資産', liability: '負債', equity: '純資産', revenue: '収益', expense: '費用' };
+const kindColor: Record<Kind, number> = { asset: 1, liability: 4, equity: 5, revenue: 2, expense: 3 };
+
+interface Posting {
+  step: number;
+  date: string;
+  /** 相手勘定科目（相手が 2 つ以上なら「諸口」） */
+  counter: string;
+  amount: number;
+}
+const ledger = new Map(accounts.map((a) => [a.name, { ...a, dr: [] as Posting[], cr: [] as Posting[] }]));
+
+entries.forEach((e, i) => {
+  const sum = (ls: Line[]) => ls.reduce((s, l) => s + l.amount, 0);
+  if (sum(e.debit) !== sum(e.credit)) throw new Error(`JournalToLedger: ${e.date} の仕訳の貸借が一致しません`);
+  const step = i + 1;
+  const counterOf = (other: Line[]) => (other.length === 1 ? other[0].account : '諸口');
+  for (const [lines, other, side] of [
+    [e.debit, e.credit, 'dr'],
+    [e.credit, e.debit, 'cr'],
+  ] as const) {
+    for (const l of lines) {
+      const acct = ledger.get(l.account);
+      if (!acct) throw new Error(`JournalToLedger: 勘定科目「${l.account}」が accounts にありません`);
+      acct[side].push({ step, date: e.date, counter: counterOf(other), amount: l.amount });
+    }
+  }
+});
+
+const rows = [...ledger.values()].map((a) => {
+  const dr = a.dr.reduce((s, p) => s + p.amount, 0);
+  const cr = a.cr.reduce((s, p) => s + p.amount, 0);
+  const bal = dr - cr;
+  return { ...a, drTotal: dr, crTotal: cr, balDr: bal > 0 ? bal : 0, balCr: bal < 0 ? -bal : 0 };
+});
+const tbDr = rows.reduce((s, r) => s + r.balDr, 0);
+const tbCr = rows.reduce((s, r) => s + r.balCr, 0);
+const last = entries.length + 1;
+
+const narration = entries.map((e) => {
+  const names = (ls: Line[]) => ls.map((l) => `「${l.account}」`).join('');
+  const multi = e.debit.length > 1 || e.credit.length > 1;
+  return (
+    `${e.date} ${e.text}。仕訳の借方${names(e.debit)}は各勘定の借方（左）へ、貸方${names(e.credit)}は各勘定の貸方（右）へ、日付・相手科目・金額を書き写します。` +
+    (multi ? '相手の科目が2つ以上あるときは、相手科目を「諸口」と書きます。' : '')
+  );
+});
+narration.push(
+  `各勘定の借方合計と貸方合計の差が残高です。残高を一覧にした残高試算表で、借方合計 ${yen(tbDr)}円と貸方合計 ${yen(tbCr)}円が一致し、転記の貸借に誤りがないことを確かめられます。`,
+);
+---
+
+<Figure
+  title={title}
+  caption={caption}
+  steps={last}
+  interval={interval}
+  intro="取引ごとに、仕訳（上）を勘定科目ごとの T字勘定（下）に書き写していきます。「次へ」か「再生」で進めます。"
+>
+  <div class="jl">
+    <div class="jl-journal">
+      <p class="jl-head">仕訳</p>
+      <p class="jl-empty" data-step-only="0">（ここに現在の取引の仕訳が表示されます）</p>
+      {
+        entries.map((e, i) => (
+          <div class="jl-entry" data-step-only={i + 1}>
+            <p class="jl-text">
+              <span class="dg-mono jl-date">{e.date}</span>
+              {e.text}
+            </p>
+            <div class="jl-je">
+              <div class="jl-je-side">
+                <span class="jl-je-label">借方</span>
+                {e.debit.map((l) => (
+                  <span class="jl-je-line">
+                    <span>{l.account}</span>
+                    <span class="dg-mono">{yen(l.amount)}</span>
+                  </span>
+                ))}
+              </div>
+              <div class="jl-je-side">
+                <span class="jl-je-label">貸方</span>
+                {e.credit.map((l) => (
+                  <span class="jl-je-line">
+                    <span>{l.account}</span>
+                    <span class="dg-mono">{yen(l.amount)}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))
+      }
+      <p class="jl-empty" data-step-only={last}>すべての取引を転記しました。各勘定の残高を集計します。</p>
+    </div>
+
+    <p class="jl-head jl-head-ledger">総勘定元帳（T字勘定）</p>
+    <div class="jl-ledger">
+      {
+        rows.map((a) => (
+          <div class="jl-acct" style={`--c: var(--dg-c${kindColor[a.kind]})`}>
+            <p class="jl-acct-name">
+              {a.name}
+              <span class="jl-kind">{kindLabel[a.kind]}</span>
+            </p>
+            <div class="jl-t">
+              {[a.dr, a.cr].map((ps) => (
+                <div class="jl-side">
+                  {ps.map((p) => (
+                    <div class="jl-post" data-step={p.step}>
+                      <span class="jl-post-desc">
+                        {p.date} {p.counter}
+                      </span>
+                      <span class="dg-mono jl-post-amt">{yen(p.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <p class="jl-bal" data-step={last}>
+              残高 <span class="dg-mono">{yen(a.balDr || a.balCr)}</span>
+              <span class="jl-bal-side">{a.balDr ? '（借方）' : a.balCr ? '（貸方）' : ''}</span>
+            </p>
+          </div>
+        ))
+      }
+    </div>
+
+    <div class="jl-tb" data-step={last}>
+      <p class="jl-head">残高試算表</p>
+      <table>
+        <thead>
+          <tr>
+            <th>借方残高</th>
+            <th>勘定科目</th>
+            <th>貸方残高</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            rows.map((r) => (
+              <tr>
+                <td class="dg-mono">{r.balDr ? yen(r.balDr) : ''}</td>
+                <td>{r.name}</td>
+                <td class="dg-mono">{r.balCr ? yen(r.balCr) : ''}</td>
+              </tr>
+            ))
+          }
+          <tr class="jl-tb-total">
+            <td class="dg-mono">{yen(tbDr)}</td>
+            <td>合計</td>
+            <td class="dg-mono">{yen(tbCr)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <Fragment slot="narration">
+    {narration.map((t, i) => <p data-step-only={i + 1}>{t}</p>)}
+  </Fragment>
+</Figure>
+
+<style>
+  .jl {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+  }
+  .jl-head {
+    margin: 0 0 4px;
+    font-weight: 700;
+    font-size: 0.88rem;
+  }
+  .jl-head-ledger {
+    margin: 4px 0 0;
+  }
+  .jl-journal {
+    min-height: 6.6em;
+    padding: 8px 12px;
+    border: 1.5px solid var(--accent);
+    border-radius: 10px;
+    background: var(--bg);
+  }
+  .jl-empty {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+  }
+  .jl-text {
+    margin: 0 0 6px;
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+  .jl-date {
+    margin-right: 6px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .jl-je {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1.5px solid var(--fg-muted);
+  }
+  .jl-je-side {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 8px 0;
+    min-width: 0;
+  }
+  .jl-je-side + .jl-je-side {
+    border-left: 1.5px solid var(--fg-muted);
+  }
+  .jl-je-label {
+    font-size: 0.72rem;
+    color: var(--fg-muted);
+  }
+  .jl-je-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 0.88rem;
+    font-weight: 700;
+  }
+  .jl-ledger {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(168px, 100%), 1fr));
+    gap: 10px;
+    align-items: start;
+  }
+  .jl-acct {
+    padding: 6px 8px 6px;
+    border: 1.5px solid var(--dg-stroke);
+    border-top: 4px solid var(--c);
+    border-radius: 8px;
+    background: var(--dg-fill);
+    min-width: 0;
+  }
+  .jl-acct-name {
+    margin: 0;
+    padding-bottom: 3px;
+    border-bottom: 1.5px solid var(--fg);
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+  .jl-kind {
+    margin-left: 6px;
+    font-weight: 400;
+    font-size: 0.7rem;
+    color: var(--fg-muted);
+  }
+  .jl-t {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 2.6em;
+  }
+  .jl-side {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 3px 3px 0;
+    min-width: 0;
+  }
+  .jl-side + .jl-side {
+    border-left: 1.5px solid var(--fg);
+  }
+  .jl-post {
+    display: flex;
+    flex-direction: column;
+    padding: 1px 3px;
+    border-radius: 4px;
+    line-height: 1.25;
+    transition: opacity 0.45s ease, background-color 0.3s ease;
+  }
+  .jl-post.is-current {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  .jl-post-desc {
+    font-size: 0.68rem;
+    color: var(--fg-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .jl-post-amt {
+    font-size: 0.8rem;
+    text-align: right;
+  }
+  @media (max-width: 480px) {
+    .jl-ledger {
+      grid-template-columns: repeat(auto-fill, minmax(min(132px, 100%), 1fr));
+    }
+    .jl-acct {
+      padding: 5px 4px;
+    }
+    .jl-post {
+      padding: 1px 1px;
+    }
+    .jl-post-amt {
+      font-size: 0.72rem;
+    }
+    .jl-post-desc {
+      font-size: 0.64rem;
+    }
+  }
+  .jl-bal {
+    margin: 4px 0 0;
+    padding-top: 3px;
+    border-top: 1px dashed var(--dg-stroke);
+    font-size: 0.78rem;
+    text-align: right;
+    font-weight: 700;
+  }
+  .jl-bal-side {
+    font-weight: 400;
+    color: var(--fg-muted);
+  }
+  .jl-tb {
+    justify-self: center;
+    width: 100%;
+    max-width: 420px;
+  }
+  .jl-tb table {
+    display: table;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    background: var(--bg);
+  }
+  .jl-tb th,
+  .jl-tb td {
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+  }
+  .jl-tb th {
+    background: var(--bg-subtle);
+    font-size: 0.8rem;
+  }
+  .jl-tb td:first-child,
+  .jl-tb td:last-child {
+    text-align: right;
+    width: 38%;
+  }
+  .jl-tb td:nth-child(2) {
+    text-align: center;
+  }
+  .jl-tb-total td {
+    font-weight: 700;
+    border-top: 2px solid var(--fg);
+  }
+</style>

@@ -59,6 +59,9 @@ async function buildTree(): Promise<TopicTree> {
     for (const rel of node.entry.data.related) {
       if (!byId.has(rel)) throw new Error(`トピック "${node.id}" の related に存在しない id "${rel}" が指定されています。`);
     }
+    for (const pre of node.entry.data.prerequisites) {
+      if (!byId.has(pre)) throw new Error(`トピック "${node.id}" の prerequisites に存在しない id "${pre}" が指定されています。`);
+    }
   }
 
   const flat: TopicNode[] = [];

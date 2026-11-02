@@ -1,0 +1,290 @@
+---
+import Base from '../layouts/Base.astro';
+import { ancestry, getTopicTree, topicUrl, url } from '../lib/topics';
+
+const tree = await getTopicTree();
+// 確認問題がある記事の一覧（記録との突き合わせに使う）
+const topics = tree.flat
+  .filter((n) => n.entry.data.quiz.length > 0)
+  .map((n) => {
+    const path = ancestry(n);
+    return {
+      id: n.id,
+      title: n.entry.data.title,
+      url: topicUrl(n.id),
+      root: path[0].id,
+      rootTitle: path[0].entry.data.title,
+      path: path
+        .slice(0, -1)
+        .map((a) => a.entry.data.title)
+        .join(' › '),
+      total: n.entry.data.quiz.length,
+    };
+  });
+---
+
+<Base title="学習の記録" description="確認問題・演習モードの解答状況と、復習が必要な記事">
+  <div class="pg" data-progress-page>
+    <h1>学習の記録</h1>
+    <p class="muted">
+      記事末尾の確認問題と演習モードで解いた結果です。記録はこのブラウザにだけ保存され、問題ごとに最新の正誤を使います。
+    </p>
+
+    <section data-empty hidden class="pg-empty">
+      <p>まだ記録がありません。</p>
+      <p>
+        記事の最後にある「確認問題」を解くか、演習モードでまとめて解くと、ここに進み具合と復習が必要な記事が表示されます。
+      </p>
+      <p class="hero-actions">
+        <a class="button" href={url('practice')}>演習モードで解く</a>
+        <a class="button button-secondary" href={url('tree')}>全体マップから記事を選ぶ</a>
+      </p>
+    </section>
+
+    <section data-filled hidden>
+      <div class="pg-summary">
+        <div class="pg-stat">
+          <span class="pg-stat-label">解いた問題</span>
+          <span class="pg-stat-value" data-answered></span>
+        </div>
+        <div class="pg-stat">
+          <span class="pg-stat-label">正答率</span>
+          <span class="pg-stat-value" data-rate></span>
+        </div>
+        <div class="pg-stat">
+          <span class="pg-stat-label">全問正解の記事</span>
+          <span class="pg-stat-value" data-mastered></span>
+        </div>
+      </div>
+
+      <h2>分野別</h2>
+      <p class="muted pg-legend">
+        <span class="pg-key pg-key-ok"></span>正解
+        <span class="pg-key pg-key-ng"></span>不正解
+        <span class="pg-key pg-key-none"></span>未解答
+      </p>
+      <div class="pg-roots" data-roots></div>
+
+      <h2>復習が必要な記事</h2>
+      <p class="muted">2問以上解いて正答率が 60% 未満の記事です。記事を読み直してから、もう一度解いてみましょう。</p>
+      <ul class="pg-list" data-weak></ul>
+
+      <h2>挑戦中の記事</h2>
+      <ul class="pg-list" data-started></ul>
+
+      <p class="hero-actions">
+        <a class="button" href={url('practice')}>演習モードで続ける</a>
+        <button type="button" class="button button-secondary" data-reset>記録を消去する</button>
+      </p>
+    </section>
+  </div>
+  <script type="application/json" data-topics set:html={JSON.stringify(topics)} />
+</Base>
+
+<script>
+  import { STATUS_LABEL, clearProgress, loadProgress, statusOf, summarize } from '../scripts/progress';
+
+  interface Topic {
+    id: string;
+    title: string;
+    url: string;
+    root: string;
+    rootTitle: string;
+    path: string;
+    total: number;
+  }
+
+  const page = document.querySelector<HTMLElement>('[data-progress-page]')!;
+  const $ = (sel: string) => page.querySelector<HTMLElement>(sel)!;
+  const topics: Topic[] = JSON.parse(document.querySelector('[data-topics]')!.textContent ?? '[]');
+
+  const render = () => {
+    const data = loadProgress();
+    const rows = topics.map((t) => {
+      const s = summarize(data[t.id], t.total);
+      return { t, s, status: statusOf(s), updatedAt: data[t.id]?.updatedAt ?? 0 };
+    });
+    const answered = rows.reduce((a, r) => a + r.s.answered, 0);
+    const correct = rows.reduce((a, r) => a + r.s.correct, 0);
+    const total = rows.reduce((a, r) => a + r.s.total, 0);
+
+    $('[data-empty]').hidden = answered > 0;
+    $('[data-filled]').hidden = answered === 0;
+    if (answered === 0) return;
+
+    $('[data-answered]').textContent = `${answered} / ${total} 問`;
+    $('[data-rate]').textContent = `${Math.round((correct / answered) * 100)}%`;
+    $('[data-mastered]').textContent = `${rows.filter((r) => r.status === 'mastered').length} / ${rows.length} 記事`;
+
+    // 分野別の積み上げバー
+    const byRoot = new Map<string, { title: string; total: number; correct: number; answered: number }>();
+    for (const r of rows) {
+      const e = byRoot.get(r.t.root) ?? { title: r.t.rootTitle, total: 0, correct: 0, answered: 0 };
+      e.total += r.s.total;
+      e.correct += r.s.correct;
+      e.answered += r.s.answered;
+      byRoot.set(r.t.root, e);
+    }
+    const rootsEl = $('[data-roots]');
+    rootsEl.innerHTML = '';
+    for (const e of byRoot.values()) {
+      const row = document.createElement('div');
+      row.className = 'pg-root';
+      const ok = (e.correct / e.total) * 100;
+      const ng = ((e.answered - e.correct) / e.total) * 100;
+      row.innerHTML = `
+        <span class="pg-root-title"></span>
+        <span class="pg-bar" role="img"><span class="pg-ok" style="width:${ok}%"></span><span class="pg-ng" style="width:${ng}%"></span></span>
+        <span class="pg-root-num">${e.correct} / ${e.total}</span>`;
+      row.querySelector('.pg-root-title')!.textContent = e.title;
+      row.querySelector('.pg-bar')!.setAttribute('aria-label', `${e.title}: ${e.total} 問中 ${e.correct} 問正解、${e.answered - e.correct} 問不正解`);
+      rootsEl.append(row);
+    }
+
+    const fill = (sel: string, list: typeof rows, emptyText: string) => {
+      const ul = $(sel);
+      ul.innerHTML = '';
+      if (list.length === 0) {
+        const li = document.createElement('li');
+        li.className = 'muted';
+        li.textContent = emptyText;
+        ul.append(li);
+        return;
+      }
+      for (const r of list) {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="pg-path"></span><a></a> <span class="pg-score"></span>`;
+        li.querySelector('.pg-path')!.textContent = r.t.path;
+        const a = li.querySelector('a')!;
+        a.href = r.t.url;
+        a.textContent = r.t.title;
+        li.querySelector('.pg-score')!.textContent = `${STATUS_LABEL[r.status]} ・ ${r.s.correct} / ${r.s.total} 問正解`;
+        ul.append(li);
+      }
+    };
+    const byRate = (a: (typeof rows)[number], b: (typeof rows)[number]) =>
+      a.s.correct / a.s.answered - b.s.correct / b.s.answered;
+    fill('[data-weak]', rows.filter((r) => r.status === 'weak').sort(byRate), '今のところありません。');
+    fill(
+      '[data-started]',
+      rows.filter((r) => r.status === 'started').sort((a, b) => b.updatedAt - a.updatedAt),
+      'ありません。',
+    );
+  };
+
+  $('[data-reset]').addEventListener('click', () => {
+    if (window.confirm('このブラウザに保存した学習の記録をすべて消去します。よろしいですか？')) {
+      clearProgress();
+      render();
+    }
+  });
+
+  render();
+</script>
+
+<style>
+  .pg-empty {
+    padding: 16px 20px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+  }
+  .pg-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .pg-stat {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-subtle);
+  }
+  .pg-stat-label {
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+  .pg-stat-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+  }
+  .pg-legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+  }
+  .pg-key {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    margin-left: 8px;
+  }
+  .pg-key-ok {
+    background: var(--dg-ok);
+  }
+  .pg-key-ng {
+    background: var(--dg-warn);
+  }
+  .pg-key-none {
+    background: var(--border);
+  }
+  .pg-roots :global(.pg-root) {
+    display: grid;
+    grid-template-columns: minmax(8em, 14em) 1fr auto;
+    gap: 10px;
+    align-items: center;
+    margin: 6px 0;
+    font-size: 0.9rem;
+  }
+  .pg-roots :global(.pg-bar) {
+    display: flex;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .pg-roots :global(.pg-ok) {
+    background: var(--dg-ok);
+  }
+  .pg-roots :global(.pg-ng) {
+    background: var(--dg-warn);
+  }
+  .pg-roots :global(.pg-root-num) {
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-muted);
+    font-size: 0.82rem;
+  }
+  @media (max-width: 520px) {
+    .pg-roots :global(.pg-root) {
+      grid-template-columns: 1fr auto;
+    }
+    .pg-roots :global(.pg-bar) {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+  }
+  .pg-list {
+    list-style: none;
+    padding: 0;
+  }
+  .pg-list :global(li) {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .pg-list :global(.pg-path) {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+  }
+  .pg-list :global(a) {
+    font-weight: 700;
+  }
+  .pg-list :global(.pg-score) {
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+</style>

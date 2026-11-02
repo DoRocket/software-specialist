@@ -1,0 +1,599 @@
+---
+import Base from '../../layouts/Base.astro';
+import { exams } from '../../data/exams';
+import { getTopicTree, url } from '../../lib/topics';
+
+const tree = await getTopicTree();
+const roots = tree.roots.map((r) => ({ id: r.id, title: r.entry.data.title }));
+---
+
+<Base title="演習モード" description="全記事の確認問題から、試験範囲・分野を選んでランダムに出題します。">
+  <div class="practice" data-practice data-questions-url={url('practice/questions.json').replace(/\/$/, '')}>
+    <h1>演習モード</h1>
+
+    <!-- 1. 条件の設定 -->
+    <section data-screen="setup">
+      <p>
+        全記事の確認問題から、条件に合う問題をランダムに出題します。解答は「学習の記録」に残り、
+        前回まちがえた問題を優先して出題することもできます。
+      </p>
+
+      <form class="pr-form" data-setup-form>
+        <fieldset>
+          <legend>試験範囲</legend>
+          <div class="pr-chips">
+            <label class="pr-chip"><input type="radio" name="exam" value="" checked />すべて</label>
+            {
+              exams.map((e) => (
+                <label class="pr-chip">
+                  <input type="radio" name="exam" value={e.id} />
+                  {e.short}
+                </label>
+              ))
+            }
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>
+            分野
+            <button type="button" class="pr-link" data-toggle-roots>すべて選択 / 解除</button>
+          </legend>
+          <div class="pr-chips">
+            {
+              roots.map((r) => (
+                <label class="pr-chip">
+                  <input type="checkbox" name="root" value={r.id} checked />
+                  {r.title}
+                </label>
+              ))
+            }
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>問題数</legend>
+          <div class="pr-chips">
+            {
+              [5, 10, 20].map((n) => (
+                <label class="pr-chip">
+                  <input type="radio" name="count" value={n} checked={n === 10} />
+                  {n} 問
+                </label>
+              ))
+            }
+          </div>
+        </fieldset>
+
+        <label class="pr-check">
+          <input type="checkbox" name="prioritize" checked />
+          まだ解いていない問題と、前回まちがえた問題を優先する
+        </label>
+
+        <div class="pr-start">
+          <button type="submit" class="button" data-start disabled>問題を読み込んでいます…</button>
+          <span class="muted" data-available aria-live="polite"></span>
+        </div>
+      </form>
+    </section>
+
+    <!-- 2. 出題 -->
+    <section data-screen="question" hidden>
+      <div class="pr-progress">
+        <span data-q-counter></span>
+        <span class="pr-bar"><span data-q-bar></span></span>
+        <button type="button" class="pr-link" data-quit>中断する</button>
+      </div>
+      <p class="pr-topic" data-q-topic></p>
+      <p class="pr-q" data-q-text tabindex="-1"></p>
+      <div class="pr-choices" data-q-choices role="group" aria-label="選択肢"></div>
+      <div class="pr-feedback" data-q-feedback hidden aria-live="polite">
+        <p class="pr-verdict" data-q-verdict></p>
+        <p data-q-explanation></p>
+        <p class="pr-review"><a data-q-review>この記事で復習する →</a></p>
+      </div>
+      <div class="pr-next">
+        <button type="button" class="button" data-next hidden>次の問題へ</button>
+        <span class="muted pr-keys">キーボード: 1〜5 で選択、Enter で次へ</span>
+      </div>
+    </section>
+
+    <!-- 3. 結果 -->
+    <section data-screen="result" hidden>
+      <h2 tabindex="-1" data-r-heading>結果</h2>
+      <p class="pr-score"><span data-r-score></span></p>
+      <h3>分野別</h3>
+      <table class="pr-table">
+        <thead><tr><th>分野</th><th>正解</th></tr></thead>
+        <tbody data-r-roots></tbody>
+      </table>
+      <div data-r-wrong-wrap>
+        <h3>まちがえた問題（記事で復習しましょう）</h3>
+        <ul class="pr-wrong" data-r-wrong></ul>
+      </div>
+      <div class="pr-actions">
+        <button type="button" class="button" data-retry-wrong>まちがえた問題をもう一度</button>
+        <button type="button" class="button button-secondary" data-restart>条件を変えて始める</button>
+        <a class="button button-secondary" href={url('progress')}>学習の記録を見る</a>
+      </div>
+    </section>
+
+    <p class="notice" data-load-error hidden>問題を読み込めませんでした。ページを再読み込みしてください。</p>
+  </div>
+</Base>
+
+<script>
+  import { loadProgress, recordAnswer } from '../../scripts/progress';
+
+  interface Question {
+    topic: string;
+    index: number;
+    title: string;
+    url: string;
+    root: string;
+    rootTitle: string;
+    exams: string[];
+    level: string | null;
+    q: string;
+    choices: string[];
+    answer: number;
+    explanation: string;
+  }
+  interface Answered {
+    question: Question;
+    correct: boolean;
+  }
+
+  const LABELS = ['ア', 'イ', 'ウ', 'エ', 'オ'];
+  const SETTINGS_KEY = 'ss:practice-settings';
+  const root = document.querySelector<HTMLElement>('[data-practice]')!;
+  const $ = <T extends HTMLElement = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+  const form = $<HTMLFormElement>('[data-setup-form]');
+  const startBtn = $<HTMLButtonElement>('[data-start]');
+  const available = $('[data-available]');
+
+  let all: Question[] = [];
+  let session: Question[] = [];
+  let pos = 0;
+  let results: Answered[] = [];
+  let answeredCurrent = false;
+
+  const show = (name: string) => {
+    for (const s of root.querySelectorAll<HTMLElement>('[data-screen]')) s.hidden = s.dataset.screen !== name;
+    window.scrollTo({ top: 0 });
+  };
+
+  // ---------- 条件 ----------
+  const readSettings = () => {
+    const fd = new FormData(form);
+    return {
+      exam: String(fd.get('exam') ?? ''),
+      roots: fd.getAll('root').map(String),
+      count: Number(fd.get('count') ?? 10),
+      prioritize: fd.get('prioritize') !== null,
+    };
+  };
+
+  const restoreSettings = () => {
+    let saved: ReturnType<typeof readSettings> | null = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null');
+    } catch {
+      saved = null;
+    }
+    // 保存した条件がなければ、ヘッダーの試験範囲で 1 つだけ選ばれている試験を初期値にする
+    if (!saved) {
+      try {
+        const header = JSON.parse(localStorage.getItem('ss:exam-filter') ?? '[]') as string[];
+        if (header.length === 1) saved = { exam: header[0], roots: [], count: 10, prioritize: true };
+      } catch {
+        // 何もしない
+      }
+    }
+    if (!saved) return;
+    for (const el of form.querySelectorAll<HTMLInputElement>('input[name="exam"]')) el.checked = el.value === saved.exam;
+    if (saved.roots.length) {
+      for (const el of form.querySelectorAll<HTMLInputElement>('input[name="root"]')) el.checked = saved.roots.includes(el.value);
+    }
+    for (const el of form.querySelectorAll<HTMLInputElement>('input[name="count"]')) el.checked = Number(el.value) === saved.count;
+    form.querySelector<HTMLInputElement>('input[name="prioritize"]')!.checked = saved.prioritize;
+  };
+
+  const filtered = () => {
+    const s = readSettings();
+    return all.filter((q) => s.roots.includes(q.root) && (!s.exam || q.exams.includes(s.exam)));
+  };
+
+  const updateAvailable = () => {
+    if (!all.length) return;
+    const n = filtered().length;
+    available.textContent = n ? `条件に合う問題: ${n} 問` : '条件に合う問題がありません。試験範囲か分野を変えてください。';
+    startBtn.disabled = n === 0;
+    startBtn.textContent = '始める';
+  };
+
+  form.addEventListener('change', updateAvailable);
+  $('[data-toggle-roots]').addEventListener('click', () => {
+    const boxes = [...form.querySelectorAll<HTMLInputElement>('input[name="root"]')];
+    const allOn = boxes.every((b) => b.checked);
+    for (const b of boxes) b.checked = !allOn;
+    updateAvailable();
+  });
+
+  const shuffle = <T,>(arr: T[]) => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
+  const pick = () => {
+    const s = readSettings();
+    const pool = shuffle(filtered());
+    if (!s.prioritize) return pool.slice(0, s.count);
+    // 未解答 → 前回不正解 → 前回正解 の順に優先する
+    const progress = loadProgress();
+    const rank = (q: Question) => {
+      const last = progress[q.topic]?.answers[String(q.index)];
+      return last === undefined ? 0 : last === false ? 1 : 2;
+    };
+    return pool.sort((a, b) => rank(a) - rank(b)).slice(0, s.count);
+  };
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(readSettings()));
+    } catch {
+      // 保存できなくても演習はできる
+    }
+    begin(pick());
+  });
+
+  // ---------- 出題 ----------
+  const begin = (questions: Question[]) => {
+    session = questions;
+    pos = 0;
+    results = [];
+    show('question');
+    render();
+  };
+
+  const render = () => {
+    const q = session[pos];
+    answeredCurrent = false;
+    $('[data-q-counter]').textContent = `問 ${pos + 1} / ${session.length}`;
+    $('[data-q-bar]').style.width = `${(pos / session.length) * 100}%`;
+    $('[data-q-topic]').textContent = `${q.rootTitle} › ${q.title}`;
+    $('[data-q-text]').innerHTML = q.q;
+    const box = $('[data-q-choices]');
+    box.innerHTML = '';
+    q.choices.forEach((c, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pr-choice';
+      b.dataset.choice = String(i);
+      b.innerHTML = `<span class="pr-label">${LABELS[i]}</span><span>${c}</span>`;
+      b.addEventListener('click', () => answer(i));
+      box.append(b);
+    });
+    $('[data-q-feedback]').hidden = true;
+    $('[data-next]').hidden = true;
+    $('[data-q-text]').focus({ preventScroll: true });
+  };
+
+  const answer = (chosen: number) => {
+    if (answeredCurrent) return;
+    answeredCurrent = true;
+    const q = session[pos];
+    const ok = chosen === q.answer;
+    results.push({ question: q, correct: ok });
+    recordAnswer(q.topic, q.index, ok);
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>('.pr-choice')];
+    buttons[chosen].classList.add(ok ? 'is-correct' : 'is-wrong');
+    buttons[q.answer].classList.add('is-correct');
+    for (const b of buttons) b.setAttribute('aria-disabled', 'true');
+    const verdict = $('[data-q-verdict]');
+    verdict.textContent = ok ? '◯ 正解！' : `✕ 不正解（正解は ${LABELS[q.answer]}）`;
+    verdict.className = `pr-verdict ${ok ? 'is-ok' : 'is-ng'}`;
+    $('[data-q-explanation]').innerHTML = q.explanation;
+    $<HTMLAnchorElement>('[data-q-review]').href = q.url;
+    $('[data-q-feedback]').hidden = false;
+    const next = $<HTMLButtonElement>('[data-next]');
+    next.textContent = pos + 1 < session.length ? '次の問題へ' : '結果を見る';
+    next.hidden = false;
+    next.focus({ preventScroll: true });
+    $('[data-q-bar]').style.width = `${((pos + 1) / session.length) * 100}%`;
+  };
+
+  const next = () => {
+    if (!answeredCurrent) return;
+    if (++pos < session.length) render();
+    else finish();
+  };
+  $('[data-next]').addEventListener('click', next);
+
+  document.addEventListener('keydown', (e) => {
+    if ($('[data-screen="question"]').hidden || e.altKey || e.ctrlKey || e.metaKey) return;
+    const n = Number(e.key);
+    if (n >= 1 && n <= session[pos].choices.length && !answeredCurrent) {
+      e.preventDefault();
+      answer(n - 1);
+    } else if (e.key === 'Enter' && answeredCurrent && document.activeElement?.tagName !== 'A') {
+      e.preventDefault();
+      next();
+    }
+  });
+
+  $('[data-quit]').addEventListener('click', () => {
+    if (results.length === 0) show('setup');
+    else finish();
+  });
+
+  // ---------- 結果 ----------
+  const finish = () => {
+    const correct = results.filter((r) => r.correct).length;
+    $('[data-r-score]').textContent = `${results.length} 問中 ${correct} 問正解（正答率 ${Math.round((correct / Math.max(results.length, 1)) * 100)}%）`;
+
+    const byRoot = new Map<string, { title: string; total: number; correct: number }>();
+    for (const r of results) {
+      const e = byRoot.get(r.question.root) ?? { title: r.question.rootTitle, total: 0, correct: 0 };
+      e.total++;
+      if (r.correct) e.correct++;
+      byRoot.set(r.question.root, e);
+    }
+    const tbody = $('[data-r-roots]');
+    tbody.innerHTML = '';
+    for (const e of byRoot.values()) {
+      const tr = document.createElement('tr');
+      const th = document.createElement('td');
+      th.textContent = e.title;
+      const td = document.createElement('td');
+      td.textContent = `${e.correct} / ${e.total}`;
+      tr.append(th, td);
+      tbody.append(tr);
+    }
+
+    const wrong = results.filter((r) => !r.correct);
+    const list = $('[data-r-wrong]');
+    list.innerHTML = '';
+    for (const r of wrong) {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = r.question.url;
+      a.textContent = r.question.title;
+      const q = document.createElement('div');
+      q.className = 'pr-wrong-q';
+      q.innerHTML = r.question.q;
+      li.append(a, q);
+      list.append(li);
+    }
+    $('[data-r-wrong-wrap]').hidden = wrong.length === 0;
+    $('[data-retry-wrong]').hidden = wrong.length === 0;
+    show('result');
+    $('[data-r-heading]').focus({ preventScroll: true });
+  };
+
+  $('[data-retry-wrong]').addEventListener('click', () => begin(shuffle(results.filter((r) => !r.correct).map((r) => r.question))));
+  $('[data-restart]').addEventListener('click', () => {
+    show('setup');
+    updateAvailable();
+  });
+
+  // ---------- 読み込み ----------
+  restoreSettings();
+  fetch(root.dataset.questionsUrl!)
+    .then((res) => {
+      if (!res.ok) throw new Error(String(res.status));
+      return res.json();
+    })
+    .then((data: Question[]) => {
+      all = data;
+      updateAvailable();
+    })
+    .catch(() => {
+      $('[data-load-error]').hidden = false;
+      startBtn.textContent = '読み込みに失敗しました';
+    });
+</script>
+
+<style>
+  .pr-form fieldset {
+    border: 0;
+    padding: 0;
+    margin: 0 0 18px;
+  }
+  .pr-form legend {
+    font-weight: 700;
+    margin-bottom: 8px;
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+  }
+  .pr-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pr-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg);
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  .pr-chip:has(input:checked) {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+  }
+  .pr-chip input {
+    accent-color: var(--accent);
+  }
+  .pr-check {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 0.92rem;
+    margin-bottom: 18px;
+  }
+  .pr-start,
+  .pr-next,
+  .pr-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+  }
+  .pr-link {
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 400;
+    color: var(--accent);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+  .pr-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+  }
+  .pr-bar {
+    flex: 1;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .pr-bar > span {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--accent);
+    transition: width 0.3s ease;
+  }
+  .pr-topic {
+    margin: 16px 0 4px;
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+  .pr-q {
+    font-weight: 600;
+    font-size: 1.05rem;
+    outline: none;
+  }
+  .pr-choices {
+    display: grid;
+    gap: 8px;
+  }
+  .pr-choices :global(.pr-choice) {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    line-height: 1.6;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .pr-choices :global(.pr-choice:hover:not([aria-disabled])) {
+    border-color: var(--accent);
+  }
+  .pr-choices :global(.pr-label) {
+    font-weight: 700;
+    color: var(--fg-muted);
+    flex: none;
+  }
+  .pr-choices :global(.is-correct) {
+    border-color: var(--dg-ok);
+    background: color-mix(in srgb, var(--dg-ok) 14%, var(--bg));
+  }
+  .pr-choices :global(.is-wrong) {
+    border-color: var(--dg-warn);
+    background: color-mix(in srgb, var(--dg-warn) 14%, var(--bg));
+  }
+  .practice :global(code) {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--bg-code);
+    padding: 1px 5px;
+    border-radius: 4px;
+    overflow-wrap: anywhere;
+  }
+  .pr-feedback {
+    margin-top: 14px;
+    padding: 12px 16px;
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    background: var(--bg-subtle);
+  }
+  .pr-feedback p {
+    margin: 0 0 6px;
+  }
+  .pr-verdict {
+    font-weight: 700;
+  }
+  .pr-verdict.is-ok {
+    color: var(--dg-ok);
+  }
+  .pr-verdict.is-ng {
+    color: var(--dg-warn);
+  }
+  .pr-next {
+    margin-top: 16px;
+  }
+  .pr-keys {
+    font-size: 0.78rem;
+  }
+  @media (hover: none) {
+    .pr-keys {
+      display: none;
+    }
+  }
+  /* プログラムから移したフォーカス（画面の切替え時）は枠を出さない */
+  [data-r-heading]:focus,
+  .pr-q:focus {
+    outline: none;
+  }
+  .pr-score {
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+  .pr-table {
+    border-collapse: collapse;
+    margin-bottom: 16px;
+  }
+  .pr-table th,
+  .pr-table :global(td) {
+    border: 1px solid var(--border);
+    padding: 4px 12px;
+    text-align: left;
+  }
+  .pr-wrong {
+    padding-left: 1.2em;
+  }
+  .pr-wrong :global(li) {
+    margin-bottom: 10px;
+  }
+  .pr-wrong :global(.pr-wrong-q) {
+    font-size: 0.88rem;
+    color: var(--fg-muted);
+  }
+  .pr-actions {
+    margin-top: 20px;
+  }
+</style>
