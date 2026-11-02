@@ -91,6 +91,8 @@ import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.ast
 | `ValueChainDiagram` | バリューチェーンの図（支援活動・主活動・マージン）。活動名を業種に合わせて置換でき、marks で強み・弱みを色分け（props: supports, primaries, marks） |
 | `SwotWorkshop` | SWOT・クロス SWOT のワークシート。項目の追加・削除、組合せの問いかけ、テキストでコピー。内容は localStorage にだけ保存（props: initial, storageKey） |
 | `PpmMatrix` | 事業ごとの市場成長率・シェア・売上高から相対的市場シェアを計算し、4象限に円で配置。境界の変更・事業の追加が可（props: businesses, growthLine, salesUnit） |
+| `JournalToLedger` | 仕訳 → 総勘定元帳（T字勘定）への転記 → 残高試算表 をステップ再生。貸借不一致や未定義の科目はビルドエラー（props: accounts, entries, interval） |
+| `BreakEvenChart` | 固定費・変動費率・売上高のスライダーで、売上高線・総費用線・損益分岐点・利益／損失の領域を描き直し、損益分岐点売上高・安全余裕率などを式つきで表示（props: fixed, rate, sales, unit, maxFixed, maxSales, presets） |
 
 部品を追加したらこの表に追記してください。
 
