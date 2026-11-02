@@ -1,0 +1,455 @@
+---
+/**
+ * PPM（プロダクトポートフォリオマネジメント）のマトリクス。事業ごとに市場成長率・自社シェア・最大競合のシェア・売上高を入力すると、
+ * 相対的市場シェア（自社シェア ÷ 最大競合のシェア）を計算し、4象限（花形・金のなる木・問題児・負け犬）に円で配置する。
+ * 円の面積は売上高に比例。横軸は慣例どおり左ほどシェアが高い対数目盛。境界の成長率は変更できる。
+ *
+ * 使い方（.mdx）:
+ *   <PpmMatrix />
+ *   <PpmMatrix growthLine={5} businesses={[{ name: '受託開発', growth: 2, share: 30, rival: 15, sales: 18 }, …]} />
+ * - growth: 市場成長率（%）、share: 自社の市場シェア（%）、rival: 最大の競合のシェア（%。自社が首位なら2位のシェア）、sales: 売上高（億円など、円の大きさ）
+ * - growthLine: 成長率の高低を分ける境界（%）。相対的市場シェアの境界は 1.0（首位かどうか）に固定
+ */
+import Figure from './Figure.astro';
+
+interface Biz {
+  name: string;
+  growth: number;
+  share: number;
+  rival: number;
+  sales: number;
+}
+interface Props {
+  title?: string;
+  caption?: string;
+  businesses?: Biz[];
+  growthLine?: number;
+  /** 売上高の単位（表示用） */
+  salesUnit?: string;
+}
+const {
+  title = 'PPM マトリクス（数値を変えると配置が変わる）',
+  caption,
+  businesses = [
+    { name: '事業A', growth: 15, share: 8, rival: 20, sales: 6 },
+    { name: '事業B', growth: 2, share: 30, rival: 15, sales: 18 },
+  ],
+  growthLine = 5,
+  salesUnit = '億円',
+} = Astro.props;
+---
+
+<Figure title={title} caption={caption}>
+  <div class="ppm" data-ppm data-ppm-init={JSON.stringify(businesses)} data-ppm-unit={salesUnit}>
+    <div class="ppm-layout">
+      <svg viewBox="0 0 400 360" role="img" aria-label="市場成長率と相対的市場シェアによる事業の配置" data-ppm-svg>
+        <g data-ppm-bg></g>
+        <g data-ppm-axes></g>
+        <g data-ppm-dots></g>
+      </svg>
+      <div class="ppm-side">
+        <div class="dg-controls ppm-line">
+          <label>成長率の境界 <input type="number" step="0.5" min="-20" max="40" value={growthLine} data-ppm-gl /> %</label>
+          <span class="ppm-hint">相対的市場シェアの境界は 1.0（首位かどうか）</span>
+        </div>
+        <ul class="ppm-result" data-ppm-result aria-live="polite"></ul>
+      </div>
+    </div>
+
+    <div class="ppm-rows" data-ppm-rows></div>
+    <div class="dg-controls ppm-actions">
+      <button type="button" class="dg-btn" data-ppm-add>事業を追加</button>
+      <button type="button" class="dg-btn" data-ppm-reset>例に戻す</button>
+    </div>
+  </div>
+</Figure>
+
+<script>
+  interface Biz {
+    name: string;
+    growth: number;
+    share: number;
+    rival: number;
+    sales: number;
+  }
+  const NS = 'http://www.w3.org/2000/svg';
+  const MAX_ROWS = 6;
+  // 描画領域
+  const L = 56;
+  const R = 388;
+  const T = 14;
+  const B = 312;
+  const RS_MAX = 10; // 左端
+  const RS_MIN = 0.1; // 右端
+  const G_MAX = 30;
+  const G_MIN = -10;
+
+  const QUAD = {
+    star: { name: '花形', act: '成長市場で首位。シェアを維持するための投資も大きく、資金の出入りが多い', color: 'var(--dg-c3)' },
+    cow: { name: '金のなる木', act: '成熟市場で首位。投資を抑えて資金を生み、他の事業に回す', color: 'var(--dg-c2)' },
+    q: { name: '問題児', act: '成長市場でシェアが低い。投資して花形に育てるか、撤退するかを選ぶ', color: 'var(--dg-c1)' },
+    dog: { name: '負け犬', act: '成熟市場でシェアが低い。縮小・撤退・売却を検討する', color: 'var(--dg-c4)' },
+  } as const;
+
+  function el(name: string, attrs: Record<string, string | number>) {
+    const e = document.createElementNS(NS, name);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+    return e;
+  }
+  const xOf = (rs: number) => {
+    const c = Math.min(RS_MAX, Math.max(RS_MIN, rs));
+    return L + ((Math.log10(RS_MAX) - Math.log10(c)) / (Math.log10(RS_MAX) - Math.log10(RS_MIN))) * (R - L);
+  };
+  const yOf = (g: number) => {
+    const c = Math.min(G_MAX, Math.max(G_MIN, g));
+    return T + ((G_MAX - c) / (G_MAX - G_MIN)) * (B - T);
+  };
+  const fmt = (n: number, d = 2) => (Number.isFinite(n) ? String(Math.round(n * 10 ** d) / 10 ** d) : '—');
+
+  function sanitize(list: unknown): Biz[] {
+    if (!Array.isArray(list)) return [];
+    return list.slice(0, MAX_ROWS).map((b, i) => ({
+      name: typeof b?.name === 'string' ? b.name.slice(0, 20) : `事業${i + 1}`,
+      growth: Number(b?.growth) || 0,
+      share: Number(b?.share) || 0,
+      rival: Number(b?.rival) || 0,
+      sales: Number(b?.sales) || 0,
+    }));
+  }
+
+  function init(root: HTMLElement) {
+    let initial: Biz[];
+    try {
+      initial = sanitize(JSON.parse(root.dataset.ppmInit ?? '[]'));
+    } catch {
+      initial = [];
+    }
+    const unit = root.dataset.ppmUnit ?? '';
+    let rows: Biz[] = initial.map((b) => ({ ...b }));
+    const glInput = root.querySelector<HTMLInputElement>('[data-ppm-gl]')!;
+    const glInitial = glInput.value;
+    const bg = root.querySelector<SVGGElement>('[data-ppm-bg]')!;
+    const axes = root.querySelector<SVGGElement>('[data-ppm-axes]')!;
+    const dots = root.querySelector<SVGGElement>('[data-ppm-dots]')!;
+    const result = root.querySelector<HTMLUListElement>('[data-ppm-result]')!;
+    const rowsBox = root.querySelector<HTMLElement>('[data-ppm-rows]')!;
+    const addBtn = root.querySelector<HTMLButtonElement>('[data-ppm-add]')!;
+
+    const quadOf = (rs: number, g: number, gl: number) => (g >= gl ? (rs >= 1 ? 'star' : 'q') : rs >= 1 ? 'cow' : 'dog');
+
+    const draw = () => {
+      const gl = Number(glInput.value);
+      const glv = Number.isFinite(gl) ? gl : 5;
+      const x1 = xOf(1);
+      const yl = yOf(glv);
+
+      // 象限の背景とラベル
+      bg.replaceChildren();
+      const quads: [keyof typeof QUAD, number, number, number, number][] = [
+        ['star', L, T, x1, yl],
+        ['q', x1, T, R, yl],
+        ['cow', L, yl, x1, B],
+        ['dog', x1, yl, R, B],
+      ];
+      for (const [k, xa, ya, xb, yb] of quads) {
+        if (yb - ya <= 0) continue;
+        bg.append(el('rect', { x: xa, y: ya, width: xb - xa, height: yb - ya, class: `ppm-q ppm-q-${k}` }));
+        const label = el('text', {
+          x: (xa + xb) / 2,
+          y: k === 'star' || k === 'q' ? ya + 18 : yb - 8,
+          'text-anchor': 'middle',
+          class: 'ppm-qlabel',
+        });
+        label.textContent = QUAD[k].name;
+        if (yb - ya > 24) bg.append(label);
+      }
+
+      // 軸・目盛
+      axes.replaceChildren();
+      axes.append(el('rect', { x: L, y: T, width: R - L, height: B - T, class: 'ppm-frame' }));
+      axes.append(el('line', { x1, y1: T, x2: x1, y2: B, class: 'ppm-mid' }));
+      axes.append(el('line', { x1: L, y1: yl, x2: R, y2: yl, class: 'ppm-mid' }));
+      for (const v of [10, 3, 1, 0.3, 0.1]) {
+        const t = el('text', { x: xOf(v), y: B + 16, 'text-anchor': 'middle', class: 'ppm-tick' });
+        t.textContent = String(v);
+        axes.append(t);
+      }
+      for (const v of [30, 20, 10, 0, -10]) {
+        const t = el('text', { x: L - 6, y: yOf(v) + 4, 'text-anchor': 'end', class: 'ppm-tick' });
+        t.textContent = `${v}%`;
+        axes.append(t);
+      }
+      const xl = el('text', { x: (L + R) / 2, y: B + 38, 'text-anchor': 'middle', class: 'ppm-axis' });
+      xl.textContent = '← 高い　相対的市場シェア（対数目盛）　低い →';
+      axes.append(xl);
+      const ylab = el('text', { x: 14, y: (T + B) / 2, 'text-anchor': 'middle', class: 'ppm-axis', transform: `rotate(-90 14 ${(T + B) / 2})` });
+      ylab.textContent = '市場成長率';
+      axes.append(ylab);
+
+      // 事業の円（売上の大きいものから描いて、小さい円を上に）
+      dots.replaceChildren();
+      result.replaceChildren();
+      const maxSales = Math.max(1, ...rows.map((b) => Math.max(0, b.sales)));
+      const order = rows.map((b, i) => ({ b, i })).sort((p, q) => q.b.sales - p.b.sales);
+      for (const { b, i } of order) {
+        if (!(b.rival > 0) || !(b.share > 0)) continue;
+        const rs = b.share / b.rival;
+        const k = quadOf(rs, b.growth, glv);
+        const r = 6 + 22 * Math.sqrt(Math.max(0, b.sales) / maxSales);
+        const g = el('g', { class: `ppm-dot ppm-dot-${k}` });
+        g.append(el('circle', { cx: xOf(rs).toFixed(1), cy: yOf(b.growth).toFixed(1), r: r.toFixed(1) }));
+        const t = el('text', { x: xOf(rs).toFixed(1), y: (yOf(b.growth) + 4).toFixed(1), 'text-anchor': 'middle', class: 'ppm-num' });
+        t.textContent = String(i + 1);
+        g.append(t);
+        dots.append(g);
+      }
+      rows.forEach((b, i) => {
+        const li = document.createElement('li');
+        if (!(b.rival > 0) || !(b.share > 0)) {
+          li.textContent = `${i + 1}. ${b.name}: シェアは 0 より大きい値を入れてください`;
+          result.append(li);
+          return;
+        }
+        const rs = b.share / b.rival;
+        const k = quadOf(rs, b.growth, glv);
+        const head = document.createElement('b');
+        head.textContent = `${i + 1}. ${b.name} → ${QUAD[k].name}`;
+        head.style.setProperty('--c', QUAD[k].color);
+        head.className = 'ppm-res-head';
+        const calc = document.createElement('span');
+        calc.className = 'dg-mono ppm-calc';
+        calc.textContent = `相対シェア ${fmt(b.share, 1)} ÷ ${fmt(b.rival, 1)} = ${fmt(rs)}、成長率 ${fmt(b.growth, 1)}%`;
+        const act = document.createElement('span');
+        act.className = 'ppm-act';
+        act.textContent = QUAD[k].act;
+        li.append(head, calc, act);
+        result.append(li);
+      });
+      addBtn.disabled = rows.length >= MAX_ROWS;
+    };
+
+    const field = (label: string, value: string | number, type: string, onInput: (v: string) => void, extra: Record<string, string> = {}) => {
+      const wrap = document.createElement('label');
+      wrap.className = 'ppm-field';
+      const s = document.createElement('span');
+      s.textContent = label;
+      const input = document.createElement('input');
+      input.type = type;
+      input.value = String(value);
+      for (const [k, v] of Object.entries(extra)) input.setAttribute(k, v);
+      input.addEventListener('input', () => onInput(input.value));
+      wrap.append(s, input);
+      return wrap;
+    };
+
+    const buildRows = () => {
+      rowsBox.replaceChildren();
+      rows.forEach((b, i) => {
+        const row = document.createElement('div');
+        row.className = 'ppm-row';
+        const no = document.createElement('span');
+        no.className = 'ppm-no';
+        no.textContent = String(i + 1);
+        row.append(
+          no,
+          field('事業名', b.name, 'text', (v) => ((b.name = v.slice(0, 20)), draw()), { maxlength: '20', class: 'ppm-name' }),
+          field('市場成長率 %', b.growth, 'number', (v) => ((b.growth = Number(v) || 0), draw()), { step: '0.5' }),
+          field('自社シェア %', b.share, 'number', (v) => ((b.share = Number(v) || 0), draw()), { step: '0.5', min: '0' }),
+          field('最大競合のシェア %', b.rival, 'number', (v) => ((b.rival = Number(v) || 0), draw()), { step: '0.5', min: '0' }),
+          field(`売上高 ${unit}`, b.sales, 'number', (v) => ((b.sales = Number(v) || 0), draw()), { step: '1', min: '0' }),
+        );
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'dg-btn ppm-del';
+        del.textContent = '削除';
+        del.setAttribute('aria-label', `${b.name}を削除`);
+        del.addEventListener('click', () => {
+          rows.splice(i, 1);
+          buildRows();
+          draw();
+        });
+        row.append(del);
+        rowsBox.append(row);
+      });
+    };
+
+    glInput.addEventListener('input', draw);
+    addBtn.addEventListener('click', () => {
+      if (rows.length >= MAX_ROWS) return;
+      rows.push({ name: `事業${rows.length + 1}`, growth: 8, share: 10, rival: 20, sales: 5 });
+      buildRows();
+      draw();
+    });
+    root.querySelector('[data-ppm-reset]')!.addEventListener('click', () => {
+      rows = initial.map((b) => ({ ...b }));
+      glInput.value = glInitial;
+      buildRows();
+      draw();
+    });
+    buildRows();
+    draw();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-ppm]').forEach(init);
+</script>
+
+<style>
+  .ppm-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
+    gap: 12px 18px;
+    align-items: start;
+  }
+  .ppm-side {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+  }
+  .ppm-line {
+    margin: 0;
+  }
+  .ppm-line input {
+    width: 5em;
+  }
+  .ppm-hint {
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+  .ppm-result {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+  }
+  .ppm-result :global(li) {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .ppm-result :global(.ppm-res-head) {
+    border-left: 4px solid var(--c);
+    padding-left: 6px;
+  }
+  .ppm-result :global(.ppm-calc) {
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
+  }
+  .ppm-result :global(.ppm-act) {
+    color: var(--fg-muted);
+    font-size: 0.8rem;
+  }
+  .ppm-rows {
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .ppm-rows :global(.ppm-row) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 6px 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+  }
+  .ppm-rows :global(.ppm-no) {
+    align-self: center;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .ppm-rows :global(.ppm-field) {
+    display: grid;
+    gap: 2px;
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+  }
+  .ppm-rows :global(.ppm-field input) {
+    width: 6.5em;
+    font: inherit;
+    font-size: 0.88rem;
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+  }
+  .ppm-rows :global(.ppm-field input.ppm-name) {
+    width: 10em;
+  }
+  .ppm-actions {
+    margin: 10px 0 0;
+  }
+  .ppm-actions button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .ppm :global(svg .ppm-q) {
+    opacity: 0.14;
+  }
+  .ppm :global(svg .ppm-q-star) {
+    fill: var(--dg-c3);
+  }
+  .ppm :global(svg .ppm-q-q) {
+    fill: var(--dg-c1);
+  }
+  .ppm :global(svg .ppm-q-cow) {
+    fill: var(--dg-c2);
+  }
+  .ppm :global(svg .ppm-q-dog) {
+    fill: var(--dg-c4);
+  }
+  .ppm :global(svg .ppm-qlabel) {
+    font-size: 14px;
+    font-weight: 700;
+    fill: var(--fg-muted);
+  }
+  .ppm :global(svg .ppm-frame) {
+    fill: none;
+    stroke: var(--dg-stroke);
+  }
+  .ppm :global(svg .ppm-mid) {
+    stroke: var(--fg-muted);
+    stroke-dasharray: 4 3;
+  }
+  .ppm :global(svg .ppm-tick) {
+    font-size: 12px;
+    fill: var(--fg-muted);
+  }
+  .ppm :global(svg .ppm-axis) {
+    font-size: 13px;
+  }
+  .ppm :global(svg .ppm-dot circle) {
+    fill-opacity: 0.75;
+    stroke: var(--fg);
+    stroke-width: 1;
+  }
+  .ppm :global(svg .ppm-dot-star circle) {
+    fill: var(--dg-c3);
+  }
+  .ppm :global(svg .ppm-dot-q circle) {
+    fill: var(--dg-c1);
+  }
+  .ppm :global(svg .ppm-dot-cow circle) {
+    fill: var(--dg-c2);
+  }
+  .ppm :global(svg .ppm-dot-dog circle) {
+    fill: var(--dg-c4);
+  }
+  .ppm :global(svg .ppm-num) {
+    font-size: 13px;
+    font-weight: 700;
+  }
+  @media (max-width: 720px) {
+    .ppm-layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

@@ -1,0 +1,177 @@
+---
+/**
+ * ファイブフォース分析の図。中央の「業界内の競争」を、新規参入・代替品・売り手・買い手の4つの力が囲む。
+ * notes を渡すと、事例の評価（強い／中程度／弱い）と根拠を各箱に表示する。
+ * 箱は HTML で組むので、スマートフォンでも文字が小さくなりすぎない（狭い画面では縦に並ぶ）。
+ *
+ * 使い方（.mdx）:
+ *   <FiveForcesDiagram />
+ *   <FiveForcesDiagram notes={{ rivalry: { level: '強い', text: '…' }, entrants: {…}, ... }} />
+ * - キー: rivalry（業界内の競争）, entrants（新規参入）, substitutes（代替品）, buyers（買い手）, suppliers（売り手）
+ * - level は「強い」「中程度」「弱い」のいずれか（色が変わる）
+ */
+import Figure from './Figure.astro';
+
+type Key = 'rivalry' | 'entrants' | 'substitutes' | 'buyers' | 'suppliers';
+interface Note {
+  level: '強い' | '中程度' | '弱い';
+  text: string;
+}
+interface Props {
+  title?: string;
+  caption?: string;
+  notes?: Partial<Record<Key, Note>>;
+}
+const { title = 'ファイブフォース分析（5つの競争要因）', caption, notes = {} } = Astro.props;
+
+const forces: { key: Key; name: string; desc: string; arrow: string }[] = [
+  { key: 'entrants', name: '新規参入の脅威', desc: '参入障壁が低いほど強い', arrow: '▼' },
+  { key: 'suppliers', name: '売り手（供給者）の交渉力', desc: '供給者が少なく代わりが利かないほど強い', arrow: '▶' },
+  { key: 'rivalry', name: '業界内の競争', desc: '既存の競合同士の敵対関係', arrow: '' },
+  { key: 'buyers', name: '買い手の交渉力', desc: '乗換えが容易で価格に敏感なほど強い', arrow: '◀' },
+  { key: 'substitutes', name: '代替品の脅威', desc: '別の手段で同じ欲求を満たせるほど強い', arrow: '▲' },
+];
+const levelClass = (n?: Note) => (n ? { 強い: 'is-high', 中程度: 'is-mid', 弱い: 'is-low' }[n.level] : '');
+---
+
+<Figure title={title} caption={caption}>
+  <div class="ff">
+    {
+      forces.map((f) => {
+        const n = notes[f.key];
+        return (
+          <div class:list={['ff-box', `ff-${f.key}`, levelClass(n)]}>
+            <span class="ff-name">{f.name}</span>
+            <span class="ff-desc">{f.desc}</span>
+            {n && (
+              <span class="ff-note">
+                <span class="ff-level">{n.level}</span>
+                {n.text}
+              </span>
+            )}
+            {f.arrow && (
+              <span class="ff-arrow" aria-hidden="true">
+                {f.arrow}
+              </span>
+            )}
+          </div>
+        );
+      })
+    }
+  </div>
+</Figure>
+
+<style>
+  .ff {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr);
+    grid-template-areas:
+      '. entrants .'
+      'suppliers rivalry buyers'
+      '. substitutes .';
+    gap: 22px 26px;
+    align-items: stretch;
+  }
+  .ff-box {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--dg-stroke);
+    border-radius: 8px;
+    background: var(--bg);
+    font-size: 0.85rem;
+    line-height: 1.55;
+    min-width: 0;
+  }
+  .ff-entrants {
+    grid-area: entrants;
+  }
+  .ff-substitutes {
+    grid-area: substitutes;
+  }
+  .ff-suppliers {
+    grid-area: suppliers;
+  }
+  .ff-buyers {
+    grid-area: buyers;
+  }
+  .ff-rivalry {
+    grid-area: rivalry;
+    border: 2px solid var(--accent);
+    background: var(--dg-fill);
+    justify-content: center;
+  }
+  .ff-name {
+    font-weight: 700;
+    font-size: 0.92rem;
+  }
+  .ff-desc {
+    color: var(--fg-muted);
+  }
+  .ff-note {
+    margin-top: 2px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--border);
+  }
+  .ff-level {
+    display: inline-block;
+    margin-right: 6px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--bg);
+    background: var(--fg-muted);
+  }
+  .is-high .ff-level {
+    background: var(--dg-warn);
+  }
+  .is-mid .ff-level {
+    background: var(--dg-c3);
+    color: #000;
+  }
+  .is-low .ff-level {
+    background: var(--dg-ok);
+  }
+  .ff-arrow {
+    position: absolute;
+    color: var(--accent);
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+  .ff-entrants .ff-arrow {
+    left: 50%;
+    bottom: -17px;
+    transform: translateX(-50%);
+  }
+  .ff-substitutes .ff-arrow {
+    left: 50%;
+    top: -17px;
+    transform: translateX(-50%);
+  }
+  .ff-suppliers .ff-arrow {
+    top: 50%;
+    right: -19px;
+    transform: translateY(-50%);
+  }
+  .ff-buyers .ff-arrow {
+    top: 50%;
+    left: -19px;
+    transform: translateY(-50%);
+  }
+  @media (max-width: 640px) {
+    .ff {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: 'rivalry' 'entrants' 'substitutes' 'buyers' 'suppliers';
+      gap: 8px;
+    }
+    .ff-arrow {
+      display: none;
+    }
+    .ff-rivalry {
+      margin-bottom: 4px;
+    }
+  }
+</style>

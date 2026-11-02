@@ -1,0 +1,200 @@
+---
+/**
+ * ポーターのバリューチェーンの図。上段に4つの支援活動、下段に5つの主活動、右端にマージン（利益）を置く。
+ * marks を渡すと、事例で「強み」「弱み」と評価した活動を色分けし、メモを一覧で表示する。
+ * 箱は HTML で組むので、狭い画面では主活動が縦に並ぶ。
+ *
+ * 使い方（.mdx）:
+ *   <ValueChainDiagram />
+ *   <ValueChainDiagram marks={{ 技術開発: { kind: 'strong', text: '…' }, 販売・マーケティング: { kind: 'weak', text: '…' } }} />
+ * - キーは活動名（supports / primaries の名前と同じ文字列）
+ * - supports / primaries で活動名を業種に合わせて置き換えられる（既定はポーターの一般形）
+ */
+import Figure from './Figure.astro';
+
+interface Mark {
+  kind: 'strong' | 'weak';
+  text: string;
+}
+interface Props {
+  title?: string;
+  caption?: string;
+  marks?: Record<string, Mark>;
+  supports?: string[];
+  primaries?: string[];
+}
+const {
+  title = 'バリューチェーン（価値連鎖）',
+  caption,
+  marks = {},
+  supports = ['全般管理（インフラストラクチャ）', '人事・労務管理', '技術開発', '調達'],
+  primaries = ['購買物流', '製造（オペレーション）', '出荷物流', '販売・マーケティング', 'サービス'],
+} = Astro.props;
+const cls = (name: string) => (marks[name] ? `is-${marks[name].kind}` : '');
+const markList = Object.entries(marks);
+---
+
+<Figure title={title} caption={caption}>
+  <div class="vc">
+    <div class="vc-chain">
+      <div class="vc-group vc-support">
+        <span class="vc-group-label">支援活動</span>
+        {
+          supports.map((s) => (
+            <div class:list={['vc-act', cls(s)]}>
+              {s}
+              {marks[s] && <span class="vc-tag">{marks[s].kind === 'strong' ? '強み' : '弱み'}</span>}
+            </div>
+          ))
+        }
+      </div>
+      <div class="vc-group vc-primary">
+        <span class="vc-group-label">主活動</span>
+        <div class="vc-primary-row" style={`--n: ${primaries.length}`}>
+          {
+            primaries.map((s) => (
+              <div class:list={['vc-act', cls(s)]}>
+                {s}
+                {marks[s] && <span class="vc-tag">{marks[s].kind === 'strong' ? '強み' : '弱み'}</span>}
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+    <div class="vc-margin"><span>マージン（利益）</span></div>
+  </div>
+  {
+    markList.length > 0 && (
+      <ul class="vc-notes">
+        {markList.map(([name, m]) => (
+          <li class={`is-${m.kind}`}>
+            <span class="vc-tag">{m.kind === 'strong' ? '強み' : '弱み'}</span>
+            <b>{name}</b>: {m.text}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</Figure>
+
+<style>
+  .vc {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 64px;
+    gap: 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .vc-chain {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+  }
+  .vc-group {
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+    border: 1px solid var(--dg-stroke);
+    border-radius: 8px 0 0 8px;
+    background: var(--dg-fill);
+  }
+  .vc-group-label {
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+  .vc-primary-row {
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    gap: 4px;
+  }
+  .vc-act {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .vc-primary-row .vc-act {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    min-height: 4.2em;
+  }
+  .vc-act.is-strong {
+    border: 2px solid var(--dg-ok);
+  }
+  .vc-act.is-weak {
+    border: 2px dashed var(--dg-warn);
+  }
+  .vc-tag {
+    display: inline-block;
+    padding: 0 7px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--bg);
+    background: var(--fg-muted);
+    white-space: nowrap;
+  }
+  .is-strong .vc-tag,
+  .vc-notes .is-strong .vc-tag {
+    background: var(--dg-ok);
+  }
+  .is-weak .vc-tag,
+  .vc-notes .is-weak .vc-tag {
+    background: var(--dg-warn);
+  }
+  .vc-margin {
+    display: grid;
+    place-items: center;
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-align: center;
+    clip-path: polygon(0 0, 55% 0, 100% 50%, 55% 100%, 0 100%);
+    padding-right: 18px;
+  }
+  .vc-margin span {
+    writing-mode: vertical-rl;
+    letter-spacing: 0.1em;
+  }
+  .vc-notes {
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+    font-size: 0.88rem;
+  }
+  .vc-notes li {
+    margin: 0;
+  }
+  .vc-notes .vc-tag {
+    margin-right: 6px;
+  }
+  @media (max-width: 640px) {
+    .vc {
+      grid-template-columns: minmax(0, 1fr) 40px;
+    }
+    .vc-primary-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .vc-primary-row .vc-act {
+      flex-direction: row;
+      text-align: left;
+      min-height: 0;
+    }
+    .vc-margin {
+      font-size: 0.75rem;
+      padding-right: 12px;
+    }
+  }
+</style>
