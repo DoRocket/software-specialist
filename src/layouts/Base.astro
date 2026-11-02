@@ -19,6 +19,8 @@ const nav = [
   { href: url('tree'), label: '全体マップ' },
   { href: url('exams'), label: '試験別' },
   { href: url('tags'), label: 'タグ' },
+  { href: url('practice'), label: '演習' },
+  { href: url('progress'), label: '学習の記録' },
 ];
 ---
 
@@ -69,6 +71,7 @@ const nav = [
     <script>
       import '../scripts/filter';
       import '../scripts/stepper';
+      import '../scripts/progress-marks';
 
       const toggle = document.querySelector<HTMLButtonElement>('[data-nav-toggle]');
       toggle?.addEventListener('click', () => {

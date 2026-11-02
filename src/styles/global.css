@@ -910,3 +910,48 @@ a {
   font-size: 0.82rem;
   margin-left: 4px;
 }
+
+/* ---------- 学習の記録の表示 ---------- */
+.progress-mark {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+.progress-mark.is-mastered {
+  background: var(--dg-ok);
+}
+.progress-mark.is-weak {
+  background: var(--dg-warn);
+}
+.progress-mark.is-started {
+  background: transparent;
+  border: 2px solid var(--fg-muted);
+  width: 9px;
+  height: 9px;
+}
+.card-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--fg-muted);
+}
+.card-progress[hidden] {
+  display: none;
+}
+.card-progress-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.card-progress-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--dg-ok);
+  border-radius: inherit;
+}

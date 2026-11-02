@@ -34,6 +34,7 @@ const isOpen = (node: TopicNode) =>
         <li
           data-topic={node.id}
           data-exams={d.exams.join(' ')}
+          data-quiz-count={d.quiz.length || undefined}
           data-tags={d.tags.join('\u001f')}
           data-search={`${d.title} ${d.summary ?? ''} ${d.tags.join(' ')}`.toLowerCase()}
         >

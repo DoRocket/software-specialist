@@ -1,6 +1,6 @@
 ---
 import type { TopicNode } from '../lib/topics';
-import { countDescendants, topicUrl } from '../lib/topics';
+import { countDescendants, topicUrl, type TopicNode as Node } from '../lib/topics';
 import ExamBadges from './ExamBadges.astro';
 import CategoryIcon from './CategoryIcon.astro';
 
@@ -10,6 +10,13 @@ interface Props {
 const { node } = Astro.props;
 const d = node.entry.data;
 const count = countDescendants(node);
+// 自身と子孫の「トピック id:問題数」。学習の記録から進み具合を計算するのに使う（src/scripts/progress-marks.ts）
+const quizIds: string[] = [];
+const collect = (n: Node) => {
+  if (n.entry.data.quiz.length) quizIds.push(`${n.id}:${n.entry.data.quiz.length}`);
+  n.children.forEach(collect);
+};
+collect(node);
 ---
 
 <a class="card" href={topicUrl(node.id)} data-deep-exams={node.deepExams.join(' ')}>
@@ -24,6 +31,10 @@ const count = countDescendants(node);
     )
   }
   {d.summary && <span class="card-summary">{d.summary}</span>}
+  <span class="card-progress" data-card-progress={quizIds.join(' ')} hidden>
+    <span class="card-progress-bar"><span data-card-progress-fill></span></span>
+    <span class="card-progress-text" data-card-progress-text></span>
+  </span>
   <span class="card-meta">
     <ExamBadges exams={node.deepExams} />
     {count > 0 && <span class="card-count">{count} 項目</span>}
