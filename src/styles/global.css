@@ -599,6 +599,15 @@ a {
   text-align: left;
   vertical-align: top;
 }
+/* 列の多い表でも 1 文字ずつ縦に折り返さないよう、セルに最小幅を持たせ、入りきらない分は表の中で横スクロールさせる */
+.prose th,
+.prose td {
+  min-width: 5.5em;
+}
+.prose td:has(> code:only-child),
+.prose th:empty {
+  min-width: 0;
+}
 .prose th {
   background: var(--bg-subtle);
 }
