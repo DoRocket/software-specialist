@@ -93,6 +93,7 @@ import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.ast
 | `PpmMatrix` | 事業ごとの市場成長率・シェア・売上高から相対的市場シェアを計算し、4象限に円で配置。境界の変更・事業の追加が可（props: businesses, growthLine, salesUnit） |
 | `JournalToLedger` | 仕訳 → 総勘定元帳（T字勘定）への転記 → 残高試算表 をステップ再生。貸借不一致や未定義の科目はビルドエラー（props: accounts, entries, interval） |
 | `BreakEvenChart` | 固定費・変動費率・売上高のスライダーで、売上高線・総費用線・損益分岐点・利益／損失の領域を描き直し、損益分岐点売上高・安全余裕率などを式つきで表示（props: fixed, rate, sales, unit, maxFixed, maxSales, presets） |
+| `UmlClassDiagram` | UML クラス図（クラスの箱、関連・集約・コンポジション・汎化、多重度）を描く静的な図。幅の広い図は狭い画面で枠内だけ横スクロール |
 
 部品を追加したらこの表に追記してください。
 
