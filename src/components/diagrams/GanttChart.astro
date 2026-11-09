@@ -1,0 +1,241 @@
+---
+/**
+ * ガントチャート（静的な図）。活動ごとに計画の横棒を描き、実績（見込み）の棒・マイルストーン・基準日の線を重ねられる。
+ * 横棒は HTML で組み、期間の列が多いときは図の中だけ横スクロールする（ページ全体ははみ出さない）。
+ *
+ * 使い方（.mdx）:
+ *   <GanttChart
+ *     total={16}
+ *     unit="週"
+ *     tasks={[
+ *       { name: 'A 要件定義', start: 1, length: 3, critical: true },
+ *       { name: 'B 審査', start: 4, length: 4, critical: true, actualStart: 4, actualLength: 6 },
+ *     ]}
+ *     milestones={[{ name: 'リリース', at: 16 }]}
+ *     today={8}
+ *   />
+ * - start は 1 始まりの期間番号（1 = 第1週）。length は期間の数
+ * - critical: true の活動はクリティカルパス上として強調色で描く
+ * - actualStart / actualLength を指定すると、計画の棒の下に実績（見込み）の棒を描く
+ * - milestones の at は「その期間の終わり」を表す
+ * - today を指定すると「その期間の終わり」に基準日の縦線を引く（例: 8 → 8週末）
+ */
+import Figure from './Figure.astro';
+
+interface Task {
+  name: string;
+  start: number;
+  length: number;
+  critical?: boolean;
+  actualStart?: number;
+  actualLength?: number;
+  /** 棒の右に添える短い注記 */
+  note?: string;
+}
+interface Milestone {
+  name: string;
+  at: number;
+}
+interface Props {
+  title?: string;
+  caption?: string;
+  total: number;
+  unit?: string;
+  tasks: Task[];
+  milestones?: Milestone[];
+  today?: number;
+  todayLabel?: string;
+}
+const { title = 'ガントチャート', caption, total, unit = '週', tasks, milestones = [], today, todayLabel } = Astro.props;
+
+for (const t of tasks) {
+  if (t.start < 1 || t.start + t.length - 1 > total) throw new Error(`GanttChart: ${t.name} が期間（1〜${total}）の外にあります`);
+  if (t.actualStart !== undefined && t.actualLength !== undefined && t.actualStart + t.actualLength - 1 > total) {
+    throw new Error(`GanttChart: ${t.name} の実績が期間（1〜${total}）の外にあります`);
+  }
+}
+
+const pct = (n: number) => `${((n / total) * 100).toFixed(4)}%`;
+const periods = Array.from({ length: total }, (_, i) => i + 1);
+const hasActual = tasks.some((t) => t.actualStart !== undefined);
+---
+
+<Figure title={title} caption={caption}>
+  <div class="gantt-scroll">
+    <div class="gantt" style={`--gantt-cols: ${total}`}>
+      <div class="gantt-row gantt-head">
+        <div class="gantt-label">活動</div>
+        <div class="gantt-track gantt-scale">
+          {periods.map((p) => <span style={`left: ${pct(p - 1)}; width: ${pct(1)}`}>{p}</span>)}
+        </div>
+      </div>
+      {
+        tasks.map((t) => (
+          <div class="gantt-row">
+            <div class="gantt-label">{t.name}</div>
+            <div class="gantt-track">
+              <span
+                class:list={['gantt-bar', 'gantt-plan', { 'is-critical': t.critical }]}
+                style={`left: ${pct(t.start - 1)}; width: ${pct(t.length)}`}
+                title={`計画: 第${t.start}〜${t.start + t.length - 1}${unit}`}
+              />
+              {t.actualStart !== undefined && t.actualLength !== undefined && (
+                <span
+                  class="gantt-bar gantt-actual"
+                  style={`left: ${pct(t.actualStart - 1)}; width: ${pct(t.actualLength)}`}
+                  title={`実績・見込み: 第${t.actualStart}〜${t.actualStart + t.actualLength - 1}${unit}`}
+                />
+              )}
+              {t.note && (
+                <span class="gantt-note" style={`left: calc(${pct(Math.max(t.start + t.length - 1, (t.actualStart ?? 0) + (t.actualLength ?? 0) - 1))} + 6px)`}>
+                  {t.note}
+                </span>
+              )}
+              {today !== undefined && <span class="gantt-today" style={`left: ${pct(today)}`} />}
+            </div>
+          </div>
+        ))
+      }
+      {
+        milestones.map((m) => (
+          <div class="gantt-row">
+            <div class="gantt-label">◆ {m.name}</div>
+            <div class="gantt-track">
+              <span class="gantt-milestone" style={`left: ${pct(m.at)}`} title={`第${m.at}${unit}末`}>◆</span>
+              {today !== undefined && <span class="gantt-today" style={`left: ${pct(today)}`} />}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+  <p class="gantt-legend">
+    <span><i class="sw sw-plan is-critical"></i>計画（クリティカルパス上）</span>
+    <span><i class="sw sw-plan"></i>計画（余裕あり）</span>
+    {hasActual && <span><i class="sw sw-actual"></i>実績・見込み</span>}
+    {today !== undefined && <span><i class="sw sw-today"></i>{todayLabel ?? `基準日（第${today}${unit}末）`}</span>}
+    <span>上の数字は第何{unit}か</span>
+  </p>
+</Figure>
+
+<style>
+  .gantt-scroll {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+  .gantt {
+    min-width: 560px;
+    font-size: 0.85rem;
+  }
+  .gantt-row {
+    display: grid;
+    grid-template-columns: 10.5em 1fr;
+    align-items: stretch;
+    border-bottom: 1px solid var(--border);
+  }
+  .gantt-label {
+    padding: 6px 8px 6px 0;
+    color: var(--fg);
+    line-height: 1.35;
+  }
+  @media (max-width: 600px) {
+    .gantt {
+      min-width: 520px;
+      font-size: 0.8rem;
+    }
+    .gantt-row {
+      grid-template-columns: 8em 1fr;
+    }
+  }
+  .gantt-head .gantt-label {
+    color: var(--fg-muted);
+  }
+  .gantt-track {
+    position: relative;
+    min-height: 2.2em;
+    background-image: linear-gradient(to right, var(--border) 1px, transparent 1px);
+    background-size: calc(100% / var(--gantt-cols)) 100%;
+  }
+  .gantt-scale span {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fg-muted);
+    font-size: 0.78rem;
+  }
+  .gantt-bar {
+    position: absolute;
+    height: 0.75em;
+    border-radius: 3px;
+  }
+  .gantt-plan {
+    top: 0.45em;
+    background: var(--dg-c2);
+    opacity: 0.75;
+  }
+  .gantt-plan.is-critical {
+    background: var(--accent);
+    opacity: 0.9;
+  }
+  .gantt-actual {
+    top: 1.3em;
+    background: var(--dg-warn);
+    height: 0.55em;
+  }
+  .gantt-note {
+    position: absolute;
+    top: 0.3em;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+  }
+  .gantt-milestone {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--accent);
+    font-size: 1rem;
+    line-height: 1;
+  }
+  .gantt-today {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    border-left: 2px dashed var(--dg-warn);
+  }
+  .gantt-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin: 8px 0 0;
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+  }
+  .gantt-legend .sw {
+    display: inline-block;
+    width: 1.4em;
+    height: 0.7em;
+    margin-right: 4px;
+    border-radius: 2px;
+    vertical-align: middle;
+  }
+  .sw-plan {
+    background: var(--dg-c2);
+    opacity: 0.75;
+  }
+  .sw-plan.is-critical {
+    background: var(--accent);
+    opacity: 0.9;
+  }
+  .sw-actual {
+    background: var(--dg-warn);
+  }
+  .sw-today {
+    height: 0 !important;
+    border-top: 2px dashed var(--dg-warn);
+  }
+</style>

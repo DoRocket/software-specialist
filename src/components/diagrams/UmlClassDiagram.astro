@@ -1,0 +1,240 @@
+---
+/**
+ * UML のクラス図（静的な図）。クラスの箱（名前・属性・操作）と、関連・集約・コンポジション・汎化の線、多重度を描く。
+ *
+ * 使い方（.mdx）:
+ *   <UmlClassDiagram
+ *     title="予約まわりのクラス図"
+ *     width={720} height={380}
+ *     classes={[
+ *       { id: 'shop', name: '店舗', attrs: ['店舗ID', '店名'], ops: ['予約金を計算する(人数)'], x: 20, y: 20, w: 180 },
+ *       { id: 'rsv', name: '予約', attrs: ['予約番号'], x: 280, y: 20, w: 180 },
+ *     ]}
+ *     relations={[
+ *       { from: 'shop', to: 'rsv', fromMult: '1', toMult: '0..*' },
+ *     ]}
+ *   />
+ * - x, y, w は viewBox 上の位置と幅。高さは属性・操作の数から自動で決まる。
+ * - 線は、2つの箱が左右に並んでいれば水平に、上下に並んでいれば垂直に引く（重なる範囲の中央）。
+ *   斜めの線は引かないので、関連のあるクラスは縦か横にそろえて置く。
+ * - kind: 'association'（既定・実線）/ 'aggregation'（from 側に白抜きのひし形）/
+ *   'composition'（from 側に黒塗りのひし形）/ 'generalization'（to 側＝スーパクラスに白抜きの三角）
+ * - fromMult / toMult: 各端に書く多重度。label: 線の中央に書く関連名。
+ * - width が 600 を超える図は、狭い画面で文字が小さくなりすぎないよう横スクロールにする。
+ */
+import Figure from './Figure.astro';
+
+interface UmlClass {
+  id: string;
+  name: string;
+  attrs?: string[];
+  ops?: string[];
+  x: number;
+  y: number;
+  w?: number;
+}
+interface Relation {
+  from: string;
+  to: string;
+  kind?: 'association' | 'aggregation' | 'composition' | 'generalization';
+  fromMult?: string;
+  toMult?: string;
+  label?: string;
+}
+interface Props {
+  title?: string;
+  caption?: string;
+  classes: UmlClass[];
+  relations?: Relation[];
+  width?: number;
+  height?: number;
+}
+const { title, caption, classes, relations = [], width = 720, height = 400 } = Astro.props;
+
+const headH = 30;
+const lineH = 20;
+const pad = 8;
+const boxes = classes.map((c) => {
+  const attrs = c.attrs ?? [];
+  const ops = c.ops ?? [];
+  const w = c.w ?? 180;
+  const attrH = Math.max(1, attrs.length) * lineH + pad;
+  const opH = Math.max(1, ops.length) * lineH + pad;
+  const h = headH + attrH + opH;
+  return { ...c, attrs, ops, w, h, attrTop: c.y + headH, opTop: c.y + headH + attrH };
+});
+const byId = new Map(boxes.map((b) => [b.id, b]));
+
+const lines = relations.map((r, i) => {
+  const a = byId.get(r.from);
+  const b = byId.get(r.to);
+  if (!a || !b) throw new Error(`UmlClassDiagram: 未定義のクラス ${r.from} / ${r.to}`);
+  const kind = r.kind ?? 'association';
+  // 左右に並ぶか（縦の範囲が重なる）、上下に並ぶか（横の範囲が重なる）
+  const vy1 = Math.max(a.y, b.y);
+  const vy2 = Math.min(a.y + a.h, b.y + b.h);
+  const hx1 = Math.max(a.x, b.x);
+  const hx2 = Math.min(a.x + a.w, b.x + b.w);
+  let x1: number, y1: number, x2: number, y2: number;
+  if (vy2 - vy1 > 10 && (a.x + a.w <= b.x || b.x + b.w <= a.x)) {
+    const y = Math.min(vy1 + 40, (vy1 + vy2) / 2);
+    y1 = y2 = y;
+    if (a.x < b.x) {
+      x1 = a.x + a.w;
+      x2 = b.x;
+    } else {
+      x1 = a.x;
+      x2 = b.x + b.w;
+    }
+  } else if (hx2 - hx1 > 10) {
+    const x = (hx1 + hx2) / 2;
+    x1 = x2 = x;
+    if (a.y < b.y) {
+      y1 = a.y + a.h;
+      y2 = b.y;
+    } else {
+      y1 = a.y;
+      y2 = b.y + b.h;
+    }
+  } else {
+    throw new Error(`UmlClassDiagram: ${r.from} と ${r.to} は縦か横にそろえて配置してください`);
+  }
+  const len = Math.hypot(x2 - x1, y2 - y1);
+  const ux = (x2 - x1) / len;
+  const uy = (y2 - y1) / len;
+  // 端の記号（ひし形・三角）
+  let shape = '';
+  let shapeClass = '';
+  if (kind === 'aggregation' || kind === 'composition') {
+    const s = 9;
+    const p0 = [x1, y1];
+    const p1 = [x1 + ux * s - uy * (s * 0.6), y1 + uy * s + ux * (s * 0.6)];
+    const p2 = [x1 + ux * s * 2, y1 + uy * s * 2];
+    const p3 = [x1 + ux * s + uy * (s * 0.6), y1 + uy * s - ux * (s * 0.6)];
+    shape = [p0, p1, p2, p3].map((p) => p.join(',')).join(' ');
+    shapeClass = kind === 'composition' ? 'uml-filled' : 'uml-hollow';
+  } else if (kind === 'generalization') {
+    const s = 14;
+    const p0 = [x2, y2];
+    const p1 = [x2 - ux * s - uy * (s * 0.6), y2 - uy * s + ux * (s * 0.6)];
+    const p2 = [x2 - ux * s + uy * (s * 0.6), y2 - uy * s - ux * (s * 0.6)];
+    shape = [p0, p1, p2].map((p) => p.join(',')).join(' ');
+    shapeClass = 'uml-hollow';
+  }
+  // 多重度は端から少し離し、線の片側（水平なら上、垂直なら右）に書く
+  const off = (x: number, y: number, dir: number) => ({
+    x: x + ux * 24 * dir + (uy !== 0 ? 8 : 0),
+    y: y + uy * 24 * dir + (ux !== 0 ? -7 : 4),
+    anchor: uy !== 0 ? 'start' : 'middle',
+  });
+  const m1 = r.fromMult ? { text: r.fromMult, ...off(x1, y1, 1) } : null;
+  const m2 = r.toMult ? { text: r.toMult, ...off(x2, y2, -1) } : null;
+  const label = r.label ? { text: r.label, x: (x1 + x2) / 2 + (uy !== 0 ? 8 : 0), y: (y1 + y2) / 2 + (ux !== 0 ? 18 : 4), anchor: uy !== 0 ? 'start' : 'middle' } : null;
+  return { key: i, x1, y1, x2, y2, shape, shapeClass, m1, m2, label };
+});
+const minWidth = width > 600 ? Math.round(width * 0.78) : 0;
+const aria = `クラス図: ${boxes.map((b) => b.name).join('、')}`;
+---
+
+<Figure title={title} caption={caption}>
+  <div class="uml-scroll">
+    <svg class="uml" viewBox={`0 0 ${width} ${height}`} style={`max-width: ${Math.round(width * 1.25)}px;${minWidth ? ` min-width: ${minWidth}px;` : ''} margin: 0 auto;`} role="img" aria-label={aria}>
+      {
+        lines.map((l) => (
+          <g>
+            <line class="uml-line" x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} />
+            {l.shape && <polygon class={l.shapeClass} points={l.shape} />}
+            {l.m1 && (
+              <text class="uml-mult" x={l.m1.x} y={l.m1.y} text-anchor={l.m1.anchor}>
+                {l.m1.text}
+              </text>
+            )}
+            {l.m2 && (
+              <text class="uml-mult" x={l.m2.x} y={l.m2.y} text-anchor={l.m2.anchor}>
+                {l.m2.text}
+              </text>
+            )}
+            {l.label && (
+              <text class="uml-label" x={l.label.x} y={l.label.y} text-anchor={l.label.anchor}>
+                {l.label.text}
+              </text>
+            )}
+          </g>
+        ))
+      }
+      {
+        boxes.map((b) => (
+          <g>
+            <rect class="uml-box" x={b.x} y={b.y} width={b.w} height={b.h} rx="4" />
+            <rect class="uml-head" x={b.x} y={b.y} width={b.w} height={headH} rx="4" />
+            <line class="uml-sep" x1={b.x} y1={b.attrTop} x2={b.x + b.w} y2={b.attrTop} />
+            <line class="uml-sep" x1={b.x} y1={b.opTop} x2={b.x + b.w} y2={b.opTop} />
+            <text class="uml-name" x={b.x + b.w / 2} y={b.y + 20} text-anchor="middle">
+              {b.name}
+            </text>
+            {b.attrs.map((a, i) => (
+              <text class="uml-member" x={b.x + 10} y={b.attrTop + 18 + i * lineH}>
+                {a}
+              </text>
+            ))}
+            {b.ops.map((o, i) => (
+              <text class="uml-member" x={b.x + 10} y={b.opTop + 18 + i * lineH}>
+                {o}
+              </text>
+            ))}
+          </g>
+        ))
+      }
+    </svg>
+  </div>
+</Figure>
+
+<style>
+  .uml-scroll {
+    overflow-x: auto;
+  }
+  .uml-box {
+    fill: var(--dg-fill);
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+  }
+  .uml-head {
+    fill: color-mix(in srgb, var(--accent) 18%, var(--dg-fill));
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+  }
+  .uml-sep {
+    stroke: var(--dg-stroke);
+    stroke-width: 1.5;
+  }
+  .uml-line {
+    stroke: var(--fg-muted);
+    stroke-width: 1.6;
+  }
+  .uml-filled {
+    fill: var(--fg);
+    stroke: var(--fg);
+    stroke-width: 1.2;
+  }
+  .uml-hollow {
+    fill: var(--bg-subtle, #fff);
+    stroke: var(--fg-muted);
+    stroke-width: 1.4;
+  }
+  :global(.diagram-body) svg .uml-name {
+    font-weight: 700;
+    font-size: 15px;
+  }
+  :global(.diagram-body) svg .uml-member {
+    font-size: 13px;
+  }
+  :global(.diagram-body) svg .uml-mult {
+    font-size: 13px;
+    font-weight: 700;
+    fill: var(--accent);
+  }
+  :global(.diagram-body) svg .uml-label {
+    font-size: 12px;
+    fill: var(--fg-muted);
+  }
+</style>

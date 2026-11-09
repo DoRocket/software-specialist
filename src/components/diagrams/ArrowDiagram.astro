@@ -10,8 +10,8 @@
  *     activities={[{ name: 'A', from: 1, to: 2, days: 3 }, …]}
  *   />
  * - nodes の x, y は viewBox（幅 width、高さ height）上の座標。結合点番号は ①② のように表示する
- * - dummy: true の作業はダミー作業（点線、所要日数 0）
- * - unit で日数の単位（既定: 日）
+ * - dummy: true の作業はダミー作業（点線、所要期間 0）
+ * - unit で所要期間の単位（既定: 日）
  * - note は最後（クリティカルパス）のステップの説明に付け足す文
  */
 import Figure from './Figure.astro';
@@ -123,7 +123,7 @@ const cpStepNo = order.length + 2;
 const steps = cpStepNo;
 ---
 
-<Figure title={title} caption={caption} interval={3500} steps={steps} intro="矢印が作業（括弧内は所要日数）、丸が結合点です。開始点から順に、各結合点の最早結合点時刻を求めていきます。">
+<Figure title={title} caption={caption} interval={3500} steps={steps} intro="矢印が作業（括弧内は所要期間）、丸が結合点です。開始点から順に、各結合点の最早結合点時刻を求めていきます。">
   <svg class="ad" viewBox={`0 0 ${width} ${height}`} style={`max-width: ${Math.round(width * 1.35)}px; margin: 0 auto;`} role="img" aria-label={title}>
     <defs>
       <marker id="ad-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -207,11 +207,11 @@ const steps = cpStepNo;
       ))
     }
     <p data-step-only={lsStepNo}>
-      <strong>最遅結合点時刻</strong>：終了点の {total} から後ろへ、所要日数を引いていきます（分岐点では小さいほう）。
+      <strong>最遅結合点時刻</strong>：終了点の {total} から後ろへ、所要期間を引いていきます（分岐点では小さいほう）。
       {[...order].reverse().map((id) => `${circled(id)}=${ls.get(id)}`).join('、')}
     </p>
     <p data-step-only={cpStepNo}>
-      最早と最遅が一致する結合点を結ぶ経路 <strong>{criticalNames.join('→')}</strong> がクリティカルパスで、最短所要日数は <strong>{total}{unit}</strong> です。{note}
+      最早と最遅が一致する結合点を結ぶ経路 <strong>{criticalNames.join('→')}</strong> がクリティカルパスで、最短の所要期間は <strong>{total}{unit}</strong> です。{note}
     </p>
   </Fragment>
 </Figure>
