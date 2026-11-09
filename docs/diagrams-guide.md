@@ -94,6 +94,7 @@ import SequenceDiagram from '../../../../components/diagrams/SequenceDiagram.ast
 | `JournalToLedger` | 仕訳 → 総勘定元帳（T字勘定）への転記 → 残高試算表 をステップ再生。貸借不一致や未定義の科目はビルドエラー（props: accounts, entries, interval） |
 | `BreakEvenChart` | 固定費・変動費率・売上高のスライダーで、売上高線・総費用線・損益分岐点・利益／損失の領域を描き直し、損益分岐点売上高・安全余裕率などを式つきで表示（props: fixed, rate, sales, unit, maxFixed, maxSales, presets） |
 | `UmlClassDiagram` | UML クラス図（クラスの箱、関連・集約・コンポジション・汎化、多重度）を描く静的な図。幅の広い図は狭い画面で枠内だけ横スクロール |
+| `GanttChart` | 計画と実績を重ねて表示する静的なガントチャート。期間の列が多いときは図の中だけ横スクロール |
 
 部品を追加したらこの表に追記してください。
 
